@@ -11,21 +11,21 @@ module_dir = os.path.dirname(__file__)
 with codecs.open(os.path.join(module_dir, "README.rst"), encoding="utf8") as f:
     long_description = f.read()
 
-setup(name="yadisk",
-      version="1.2.14",
+setup(name="yadisk-async",
+      version="1.3.0",
       packages=find_packages(exclude=("tests",)),
-      description="Библиотека-клиент REST API Яндекс.Диска / Yandex.Disk REST API client library",
+      description="Библиотека-клиент REST API Яндекс.Диска с поддержкой async/await / Yandex.Disk REST API client library with async/await support",
       long_description=long_description,
       author="Ivan Konovalov",
       author_email="ivknv0@gmail.com",
       license="LGPLv3",
-      python_requires=">=3",
-      install_requires=["requests"],
-      url="https://github.com/ivknv/yadisk",
-      project_urls={"Source code": "https://github.com/ivknv/yadisk",
-                    "Documentation (EN)": "https://yadisk.readthedocs.io/en/latest",
-                    "Documentation (RU)": "https://yadisk.readthedocs.io/ru/latest",
-                    "Bug tracker": "https://github.com/ivknv/yadisk/issues"},
+      python_requires=">=3.6",
+      install_requires=["aiohttp"],
+      url="https://github.com/ivknv/yadisk-async",
+      project_urls={"Source code": "https://github.com/ivknv/yadisk-async",
+                    "Documentation (EN)": "https://yadisk-async.readthedocs.io/en/latest",
+                    "Documentation (RU)": "https://yadisk-async.readthedocs.io/ru/latest",
+                    "Bug tracker": "https://github.com/ivknv/yadisk-async/issues"},
       classifiers=[
           "Development Status :: 4 - Beta",
           "Intended Audience :: Developers",
@@ -37,4 +37,4 @@ setup(name="yadisk",
           "Topic :: Internet",
           "Topic :: Software Development :: Libraries",
           "Topic :: Software Development :: Libraries :: Python Modules"],
-      keywords="yandex yandex.disk rest")
+      keywords="yandex yandex.disk rest async")

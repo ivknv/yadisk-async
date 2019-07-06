@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from collections import defaultdict
-import time
+import asyncio
 
-import requests.exceptions
+import aiohttp
 
 from .objects import ErrorObject
 from .exceptions import *
@@ -33,22 +33,22 @@ EXCEPTION_MAP = {400: defaultdict(lambda: BadRequestError,
                  504: defaultdict(lambda: GatewayTimeoutError),
                  509: defaultdict(lambda: InsufficientStorageError)}
 
-def get_exception(response):
+async def get_exception(response):
     """
         Get an exception instance based on response, assuming the request has failed.
 
-        :param response: an instance of :any:`requests.Response`
+        :param response: an instance of :any:`aiohttp.ClientResponse`
 
         :returns: an exception instance, subclass of :any:`YaDiskError`
     """
 
-    exc_group = EXCEPTION_MAP.get(response.status_code, None)
+    exc_group = EXCEPTION_MAP.get(response.status, None)
 
     if exc_group is None:
         return UnknownYaDiskError("Unknown Yandex.Disk error")
 
     try:
-        js = response.json()
+        js = await response.json()
     except (ValueError, RuntimeError):
         js = None
 
@@ -58,13 +58,13 @@ def get_exception(response):
     desc = error.description or "<empty>"
 
     exc = exc_group[error.error]
-        
+
     return exc(error.error, "%s (%s / %s)" % (msg, desc, error.error), response)
 
-def auto_retry(func, n_retries=None, retry_interval=None):
+async def auto_retry(func, n_retries=None, retry_interval=None):
     """
         Attempt to perform a request with automatic retries.
-        A retry is triggered by :any:`requests.exceptions.RequestException` or :any:`RetriableYaDiskError`.
+        A retry is triggered by :any:`aiohttp.ClientError` or :any:`RetriableYaDiskError`.
 
         :param func: function to run, must not require any arguments
         :param n_retries: `int`, maximum number of retries
@@ -81,10 +81,13 @@ def auto_retry(func, n_retries=None, retry_interval=None):
 
     for i in range(n_retries + 1):
         try:
-            return func()
-        except (requests.exceptions.RequestException, RetriableYaDiskError) as e:
+            if asyncio.iscoroutinefunction(func):
+                return await func()
+            else:
+                return func()
+        except (aiohttp.ClientError, RetriableYaDiskError) as e:
             if i == n_retries:
                 raise e
 
         if retry_interval:
-            time.sleep(retry_interval)
+            await asyncio.sleep(retry_interval)

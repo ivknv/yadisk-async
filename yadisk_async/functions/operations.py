@@ -4,11 +4,11 @@ from ..api import GetOperationStatusRequest
 
 __all__ = ["get_operation_status"]
 
-def get_operation_status(session, operation_id, **kwargs):
+async def get_operation_status(session, operation_id, **kwargs):
     """
         Get operation status.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param operation_id: ID of the operation or a link
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
@@ -20,6 +20,6 @@ def get_operation_status(session, operation_id, **kwargs):
     """
 
     request = GetOperationStatusRequest(session, operation_id, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process().status
+    return (await request.process()).status

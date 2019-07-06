@@ -4,11 +4,11 @@ from ..api import DiskInfoRequest
 
 __all__ = ["get_disk_info"]
 
-def get_disk_info(session, **kwargs):
+async def get_disk_info(session, **kwargs):
     """
         Get disk information.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -19,6 +19,6 @@ def get_disk_info(session, **kwargs):
     """
 
     request = DiskInfoRequest(session, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()

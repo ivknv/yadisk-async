@@ -1,9 +1,18 @@
 Changelog
 =========
 
+.. _yadisk: https://github.com/ivknv/yadisk
+
 .. _issue #2: https://github.com/ivknv/yadisk/issues/2
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
+
+* **Release 1.3.0 (2019-07-06)**
+
+  * Modified the original library (`yadisk`_) to support `async/await`
+  * The library was renamed to `yadisk-async`
+
+The following releases are for `yadisk`_, the original library:
 
 * **Release 1.2.14 (2019-03-26)**
 

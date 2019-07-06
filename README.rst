@@ -1,26 +1,22 @@
 YaDisk
 ======
 
-.. image:: https://img.shields.io/readthedocs/yadisk.svg
+.. image:: https://img.shields.io/readthedocs/yadisk-async.svg
    :alt: Read the Docs
-   :target: https://yadisk.readthedocs.io/en/latest/
+   :target: https://yadisk-async.readthedocs.io/en/latest/
    
-.. image:: https://img.shields.io/pypi/v/yadisk.svg
+.. image:: https://img.shields.io/pypi/v/yadisk-async.svg
    :alt: PyPI
-   :target: https://pypi.org/project/yadisk
+   :target: https://pypi.org/project/yadisk-async
    
-.. image:: https://img.shields.io/aur/version/python-yadisk.svg
+.. image:: https://img.shields.io/aur/version/python-yadisk-async.svg
    :alt: AUR
-   :target: https://aur.archlinux.org/packages/python-yadisk
+   :target: https://aur.archlinux.org/packages/python-yadisk-async
    
-.. image:: https://img.shields.io/badge/Donate-PayPal-green.svg
-   :alt: Donate
-   :target: https://paypal.me/encryptandsync
+YaDisk-async - это библиотека-клиент REST API Яндекс.Диска с поддержкой async/await.
 
-YaDisk - это библиотека-клиент REST API Яндекс.Диска.
-
-.. _Read the Docs (EN): http://yadisk.readthedocs.io
-.. _Read the Docs (RU): http://yadisk.readthedocs.io/ru/latest
+.. _Read the Docs (EN): http://yadisk-async.readthedocs.io
+.. _Read the Docs (RU): http://yadisk-async.readthedocs.io/ru/latest
 
 Документация доступна на `Read the Docs (RU)`_ и `Read the Docs (EN)`_.
 
@@ -29,7 +25,7 @@ YaDisk - это библиотека-клиент REST API Яндекс.Диск
 
 .. code:: bash
 
-    pip install yadisk
+    pip install yadisk-async
 
 или
 
@@ -42,43 +38,55 @@ YaDisk - это библиотека-клиент REST API Яндекс.Диск
 
 .. code:: python
 
-    import yadisk
+    import yadisk_async
 
-    y = yadisk.YaDisk(token="<токен>")
+    y = yadisk_async.YaDisk(token="<token>")
     # или
-    # y = yadisk.YaDisk("<id-приложения>", "<secret-приложения>", "<токен>")
+    # y = yadisk_async.YaDisk("<id-приложения>", "<secret-приложения>", "<токен>")
 
     # Проверяет, валиден ли токен
-    print(y.check_token())
+    print(await y.check_token())
 
     # Получает общую информацию о диске
-    print(y.get_disk_info())
+    print(await y.get_disk_info())
 
     # Выводит содержимое "/some/path"
-    print(list(y.listdir("/some/path")))
+    print([i async for i in await y.listdir("/some/path")])
 
     # Загружает "file_to_upload.txt" в "/destination.txt"
-    y.upload("file_to_upload.txt", "/destination.txt")
+    await y.upload("file_to_upload.txt", "/destination.txt")
 
     # То же самое
     with open("file_to_upload.txt", "rb") as f:
-        y.upload(f, "/destination.txt")
+        await y.upload(f, "/destination.txt")
 
     # Скачивает "/some-file-to-download.txt" в "downloaded.txt"
-    y.download("/some-file-to-download.txt", "downloaded.txt")
+    await y.download("/some-file-to-download.txt", "downloaded.txt")
 
     # Безвозвратно удаляет "/file-to-remove"
-    y.remove("/file-to-remove", permanently=True)
+    await y.remove("/file-to-remove", permanently=True)
 
     # Создаёт новую папку "/test-dir"
-    print(y.mkdir("/test-dir"))
+    print(await y.mkdir("/test-dir"))
+
+    # Всегда закрывайте все соединения или получите предупреждение
+    await y.close()
 
 История изменений
 *****************
 
+.. _yadisk: https://github.com/ivknv/yadisk
+
 .. _issue #2: https://github.com/ivknv/yadisk/issues/2
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
+
+* **Release 1.3.0 (2019-07-06)**
+
+  * Реализована поддержка `async/await`
+  * Библиотека была переименована из `yadisk_` в `yadisk-async`
+
+Следующие релизы относятся к оригинальной библиотеке `yadisk_`:
 
 * **Release 1.2.14 (2019-03-26)**
 

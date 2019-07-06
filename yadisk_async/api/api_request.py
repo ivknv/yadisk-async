@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import requests
-
 from ..utils import auto_retry, get_exception
+from ..common import CaseInsensitiveDict
 from .. import settings
 
 __all__ = ["APIRequest"]
@@ -14,13 +13,13 @@ class APIRequest(object):
     """
         Base class for all API requests.
 
-        :param session: an instance of :any:`requests.Session`
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders`
         :param args: `dict` of arguments, that will be passed to `process_args`
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
         :param n_retries: `int`, maximum number of retries
         :param retry_interval: delay between retries in seconds
-        :param kwargs: other arguments for :any:`requests.Session.send`
+        :param kwargs: other arguments for :any:`aiohttp.ClientSession.request`
 
         :ivar url: `str`, request URL
         :ivar method: `str`, request method
@@ -76,42 +75,40 @@ class APIRequest(object):
         self.n_retries = n_retries
         self.retry_interval = retry_interval
         self.headers = headers
-        self.request = None
         self.response = None
         self.data = {}
         self.params = {}
 
         self.process_args(**self.args)
-        self.prepare()
 
     def process_args(self):
         raise NotImplementedError
 
-    def prepare(self):
-        """Prepare the request"""
+    async def _attempt(self):
+        headers = CaseInsensitiveDict(self.session.headers)
+        headers["Content-Type"] = self.content_type
+        headers.update(self.headers)
 
-        r = requests.Request(self.method, self.url,
-                             data=self.data, params=self.params)
-        r.headers["Content-Type"] = self.content_type
-        r.headers.update(self.headers)
-        self.request = self.session.prepare_request(r)
+        kwargs = dict(self.send_kwargs)
+        kwargs.update({"headers": headers,
+                       "data":    self.data,
+                       "params":  self.params})
 
-    def _attempt(self):
-        self.response = self.session.send(self.request, **self.send_kwargs)
+        self.response = await self.session.request(self.method, self.url, **kwargs)
 
-        success = self.response.status_code in self.success_codes
+        success = self.response.status in self.success_codes
 
         if not success:
-            raise get_exception(self.response)
+            raise await get_exception(self.response)
 
-    def send(self):
+    async def send(self):
         """
             Actually send the request
            
-           :returns: :any:`requests.Response` (`self.response`)
+           :returns: :any:`aiohttp.ClientResponse` (`self.response`)
         """
 
-        auto_retry(self._attempt, self.n_retries, self.retry_interval)
+        await auto_retry(self._attempt, self.n_retries, self.retry_interval)
 
         return self.response
 
@@ -126,7 +123,7 @@ class APIRequest(object):
 
         raise NotImplementedError
 
-    def process(self):
+    async def process(self):
         """
             Process the response.
 
@@ -134,7 +131,7 @@ class APIRequest(object):
         """
 
         try:
-            result = self.response.json()
+            result = await self.response.json()
         except (ValueError, RuntimeError):
             result = None
 

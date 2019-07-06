@@ -5,26 +5,25 @@ try:
 except ImportError:
     from urllib import urlencode
 
-import requests
-
 from .disk import get_disk_info
+from ..session import SessionWithHeaders
 from ..api import GetTokenRequest, RefreshTokenRequest, RevokeTokenRequest
 from ..exceptions import UnauthorizedError
 
 __all__ = ["check_token", "get_auth_url", "get_code_url", "get_token",
            "refresh_token", "revoke_token"]
 
-def check_token(session, **kwargs):
+async def check_token(session, **kwargs):
     """
         Check whether the token is valid.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
 
         :returns: `bool`
     """
 
     try:
-        get_disk_info(session, **kwargs)
+        await get_disk_info(session, **kwargs)
         return True
     except UnauthorizedError:
         return False
@@ -110,7 +109,7 @@ def get_code_url(client_id, **kwargs):
 
     return get_auth_url(client_id, **kwargs)
 
-def get_token(code, client_id, client_secret, **kwargs):
+async def get_token(code, client_id, client_secret, **kwargs):
     """
         Get a new token.
 
@@ -126,13 +125,13 @@ def get_token(code, client_id, client_secret, **kwargs):
         :returns: :any:`TokenObject`
     """
 
-    with requests.Session() as session:
+    async with SessionWithHeaders() as session:
         request = GetTokenRequest(session, code, client_id, client_secret, **kwargs)
-        request.send()
+        await request.send()
 
-        return request.process()
+        return await request.process()
 
-def refresh_token(refresh_token, client_id, client_secret, **kwargs):
+async def refresh_token(refresh_token, client_id, client_secret, **kwargs):
     """
         Refresh an existing token.
 
@@ -147,14 +146,14 @@ def refresh_token(refresh_token, client_id, client_secret, **kwargs):
         :returns: :any:`TokenObject`
     """
 
-    with requests.Session() as session:
+    async with SessionWithHeaders() as session:
         request = RefreshTokenRequest(session, refresh_token,
                                       client_id, client_secret, **kwargs)
-        request.send()
+        await request.send()
 
-        return request.process()
+        return await request.process()
 
-def revoke_token(token, client_id, client_secret, **kwargs):
+async def revoke_token(token, client_id, client_secret, **kwargs):
     """
         Revoke the token.
 
@@ -169,9 +168,9 @@ def revoke_token(token, client_id, client_secret, **kwargs):
         :returns: :any:`TokenRevokeStatusObject`
     """
 
-    with requests.Session() as session:
+    async with SessionWithHeaders() as session:
         request = RevokeTokenRequest(session, token,
                                      client_id, client_secret, **kwargs)
-        request.send()
+        await request.send()
 
-        return request.process()
+        return await request.process()

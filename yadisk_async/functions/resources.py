@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import contextlib
+import io
 
 from ..api import CopyRequest, GetDownloadLinkRequest, GetMetaRequest
 from ..api import GetUploadLinkRequest, MkdirRequest, DeleteRequest, GetTrashRequest
@@ -22,13 +22,13 @@ __all__ = ["copy", "download", "exists", "get_download_link", "get_meta", "get_t
            "is_trash_file", "get_public_resources", "patch", "get_files",
            "get_last_uploaded", "upload_url", "get_public_download_link", "download_public"]
 
-def copy(session, src_path, dst_path, **kwargs):
+async def copy(session, src_path, dst_path, **kwargs):
     """
         Copy `src_path` to `dst_path`.
         If the operation is performed asynchronously, returns the link to the operation,
         otherwise, returns the link to the newly created resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param src_path: source path
         :param dst_path: destination path
         :param overwrite: if `True` the destination path can be overwritten,
@@ -45,15 +45,15 @@ def copy(session, src_path, dst_path, **kwargs):
 
     request = CopyRequest(session, src_path, dst_path, **kwargs)
 
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def download(session, src_path, file_or_path, **kwargs):
+async def download(session, src_path, file_or_path, **kwargs):
     """
         Download the file.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param src_path: source path
         :param path_or_file: destination path or file-like object
         :param timeout: `float` or `tuple`, request timeout
@@ -94,17 +94,15 @@ def download(session, src_path, file_or_path, **kwargs):
 
         file_position = file.tell()
 
-        def attempt():
+        async def attempt():
             temp_kwargs = dict(kwargs)
             temp_kwargs["n_retries"] = 0
             temp_kwargs["retry_interval"] = 0.0
-            link = get_download_link(session, src_path, **temp_kwargs)
+            link = await get_download_link(session, src_path, **temp_kwargs)
 
             # session.get() doesn't accept these parameters
             for k in ("n_retries", "retry_interval", "fields"):
                 temp_kwargs.pop(k, None)
-
-            temp_kwargs.setdefault("stream", True)
 
             # Disable keep-alive by default, since the download server is random
             try:
@@ -114,35 +112,39 @@ def download(session, src_path, file_or_path, **kwargs):
 
             file.seek(file_position)
 
-            with contextlib.closing(session.get(link, **temp_kwargs)) as response:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        file.write(chunk)
+            async with session.get(link, **temp_kwargs) as response:
+                while True:
+                    chunk = await response.content.read(8192)
 
-                if response.status_code != 200:
-                    raise get_exception(response)
+                    if not chunk:
+                        break
 
-        auto_retry(attempt, n_retries, retry_interval)
+                    file.write(chunk)
+
+                if response.status != 200:
+                    raise await get_exception(response)
+
+        await auto_retry(attempt, n_retries, retry_interval)
     finally:
         if close_file and file is not None:
             file.close()
 
-def _exists(get_meta_function, *args, **kwargs):
+async def _exists(get_meta_function, *args, **kwargs):
     kwargs = dict(kwargs)
     kwargs["limit"] = 0
 
     try:
-        get_meta_function(*args, **kwargs)
+        await get_meta_function(*args, **kwargs)
 
         return True
     except PathNotFoundError:
         return False
 
-def exists(session, path, **kwargs):
+async def exists(session, path, **kwargs):
     """
         Check whether `path` exists.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -152,13 +154,13 @@ def exists(session, path, **kwargs):
         :returns: `bool`
     """
 
-    return _exists(get_meta, session, path, **kwargs)
+    return await _exists(get_meta, session, path, **kwargs)
 
-def get_download_link(session, path, **kwargs):
+async def get_download_link(session, path, **kwargs):
     """
         Get a download link for a file (or a directory).
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
@@ -170,15 +172,15 @@ def get_download_link(session, path, **kwargs):
     """
 
     request = GetDownloadLinkRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process().href
+    return (await request.process()).href
 
-def get_meta(session, path, **kwargs):
+async def get_meta(session, path, **kwargs):
     """
         Get meta information about a file/directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -195,21 +197,21 @@ def get_meta(session, path, **kwargs):
     """
 
     request = GetMetaRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def _get_type(get_meta_function, session, *args, **kwargs):
+async def _get_type(get_meta_function, session, *args, **kwargs):
     kwargs = dict(kwargs)
     kwargs["limit"] = 0
 
-    return get_meta_function(session, *args, **kwargs).type
+    return await get_meta_function(session, *args, **kwargs).type
 
-def get_type(session, path, **kwargs):
+async def get_type(session, path, **kwargs):
     """
         Get resource type.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -219,13 +221,13 @@ def get_type(session, path, **kwargs):
         :returns: "file" or "dir"
     """
 
-    return _get_type(get_meta, session, path, **kwargs)
+    return await _get_type(get_meta, session, path, **kwargs)
 
-def get_upload_link(session, path, **kwargs):
+async def get_upload_link(session, path, **kwargs):
     """
         Get a link to upload the file using the PUT request.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: destination path
         :param overwrite: `bool`, determines whether to overwrite the destination
         :param fields: list of keys to be included in the response
@@ -238,15 +240,15 @@ def get_upload_link(session, path, **kwargs):
     """
 
     request = GetUploadLinkRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process().href
+    return (await request.process()).href
 
-def is_dir(session, path, **kwargs):
+async def is_dir(session, path, **kwargs):
     """
         Check whether `path` is a directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -257,15 +259,15 @@ def is_dir(session, path, **kwargs):
     """
 
     try:
-        return get_type(session, path, **kwargs) == "dir"
+        return (await get_type(session, path, **kwargs)) == "dir"
     except PathNotFoundError:
         return False
 
-def is_file(session, path, **kwargs):
+async def is_file(session, path, **kwargs):
     """
         Check whether `path` is a file.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -276,11 +278,11 @@ def is_file(session, path, **kwargs):
     """
 
     try:
-        return get_type(session, path, **kwargs) == "file"
+        return (await get_type(session, path, **kwargs)) == "file"
     except PathNotFoundError:
         return False
 
-def _listdir(get_meta_function, session, path, kwargs):
+async def _listdir(get_meta_function, session, path, kwargs):
     # kwargs is passed this way to avoid a TypeError sometimes (see issue https://github.com/ivknv/yadisk/issues/7)
     kwargs = dict(kwargs)
     kwargs.setdefault("limit", 10000)
@@ -300,7 +302,7 @@ def _listdir(get_meta_function, session, path, kwargs):
 
     kwargs["fields"].extend(NECESSARY_FIELDS)
 
-    result = get_meta_function(session, path, **kwargs)
+    result = await get_meta_function(session, path, **kwargs)
 
     if result.type == "file":
         raise WrongResourceTypeError("%r is a file" % (path,))
@@ -315,7 +317,7 @@ def _listdir(get_meta_function, session, path, kwargs):
     while offset + limit < total:
         offset += limit
         kwargs["offset"] = offset
-        result = get_meta_function(session, path, **kwargs)
+        result = await get_meta_function(session, path, **kwargs)
 
         for child in result.embedded.items:
             yield child
@@ -323,11 +325,11 @@ def _listdir(get_meta_function, session, path, kwargs):
         limit = result.embedded.limit
         total = result.embedded.total
 
-def listdir(session, path, **kwargs):
+async def listdir(session, path, **kwargs):
     """
         Get contents of `path`.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the directory
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -344,11 +346,11 @@ def listdir(session, path, **kwargs):
 
     return _listdir(get_meta, session, path, kwargs) # NOT A TYPO!
 
-def mkdir(session, path, **kwargs):
+async def mkdir(session, path, **kwargs):
     """
         Create a new directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the directory to be created
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
@@ -360,16 +362,15 @@ def mkdir(session, path, **kwargs):
     """
 
     request = MkdirRequest(session, path, **kwargs)
+    await request.send()
 
-    request.send()
+    return await request.process()
 
-    return request.process()
-
-def remove(session, path, **kwargs):
+async def remove(session, path, **kwargs):
     """
         Remove the resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be removed
         :param permanently: if `True`, the resource will be removed permanently,
                             otherwise, it will be just moved to the trash
@@ -385,16 +386,69 @@ def remove(session, path, **kwargs):
     """
 
     request = DeleteRequest(session, path, **kwargs)
+    await request.send()
 
-    request.send()
+    return await request.process()
 
-    return request.process()
+class UnclosableFile(io.IOBase):
+    """
+        File-like object that cannot be closed.
+        It exists only to prevent aiohttp from closing the file after uploading
+        it with the PUT request.
+    """
 
-def upload(session, file_or_path, dst_path, **kwargs):
+    def __init__(self, file):
+        io.IOBase.__init__(self)
+        self.file = file
+
+    def close(self):
+        pass
+
+    @property
+    def closed(self):
+        return self.file.closed
+
+    def flush(self):
+        self.file.flush()
+
+    def seek(self, *args, **kwargs):
+        return self.file.seek(*args, **kwargs)
+
+    def seekable(self):
+        return self.file.seekable()
+
+    def tell(self):
+        return self.file.tell()
+
+    def truncate(self, *args, **kwargs):
+        return self.file.truncate(*args, **kwargs)
+
+    def writable(self):
+        return self.file.writable()
+
+    def readable(self):
+        return self.file.readable()
+
+    def read(self, *args, **kwargs):
+        return self.file.read(*args, **kwargs)
+
+    def readline(self, *args, **kwargs):
+        return self.file.readline(*args, **kwargs)
+
+    def readlines(self, *args, **kwargs):
+        return self.file.readlines(*args, **kwargs)
+
+    def write(self, *args, **kwargs):
+        return self.file.write(*args, **kwargs)
+
+    def writelines(self, *args, **kwargs):
+        return self.file.writelines(*args, **kwargs)
+
+async def upload(session, file_or_path, dst_path, **kwargs):
     """
         Upload a file to disk.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param file_or_path: path or file-like object to be uploaded
         :param dst_path: destination path
         :param overwrite: if `True`, the resource will be overwritten if it already exists,
@@ -437,18 +491,16 @@ def upload(session, file_or_path, dst_path, **kwargs):
 
         file_position = file.tell()
 
-        def attempt():
+        async def attempt():
             temp_kwargs = dict(kwargs)
             temp_kwargs["n_retries"] = 0
             temp_kwargs["retry_interval"] = 0.0
 
-            link = get_upload_link(session, dst_path, **temp_kwargs)
+            link = await get_upload_link(session, dst_path, **temp_kwargs)
 
             # session.put() doesn't accept these parameters
             for k in ("n_retries", "retry_interval", "overwrite", "fields"):
                 temp_kwargs.pop(k, None)
-
-            temp_kwargs.setdefault("stream", True)
 
             # Disable keep-alive by default, since the upload server is random
             try:
@@ -458,20 +510,22 @@ def upload(session, file_or_path, dst_path, **kwargs):
 
             file.seek(file_position)
 
-            with contextlib.closing(session.put(link, data=file, **temp_kwargs)) as response:
-                if response.status_code != 201:
-                    raise get_exception(response)
+            # UnclosableFile is used here to prevent aiohttp from closing the file
+            # after uploading it
+            async with session.put(link, data=UnclosableFile(file), **temp_kwargs) as response:
+                if response.status != 201:
+                    raise await get_exception(response)
 
-        auto_retry(attempt, n_retries, retry_interval)
+        await auto_retry(attempt, n_retries, retry_interval)
     finally:
         if close_file and file is not None:
             file.close()
 
-def get_trash_meta(session, path, **kwargs):
+async def get_trash_meta(session, path, **kwargs):
     """
         Get meta information about a trash resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -488,16 +542,15 @@ def get_trash_meta(session, path, **kwargs):
     """
 
     request = GetTrashRequest(session, path, **kwargs)
+    await request.send()
 
-    request.send()
+    return await request.process()
 
-    return request.process()
-
-def trash_exists(session, path, **kwargs):
+async def trash_exists(session, path, **kwargs):
     """
         Check whether the trash resource at `path` exists.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -507,14 +560,14 @@ def trash_exists(session, path, **kwargs):
         :returns: `bool`
     """
 
-    return _exists(get_trash_meta, session, path, **kwargs)
+    return await _exists(get_trash_meta, session, path, **kwargs)
 
-def restore_trash(session, path, dst_path=None, **kwargs):
+async def restore_trash(session, path, dst_path=None, **kwargs):
     """
         Restore a trash resource.
         Returns a link to the newly created resource or a link to the asynchronous operation.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource to be restored
         :param dst_path: destination path
         :param overwrite: `bool`, determines whether the destination can be overwritten
@@ -532,15 +585,15 @@ def restore_trash(session, path, dst_path=None, **kwargs):
     kwargs["dst_path"] = dst_path
 
     request = RestoreTrashRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def move(session, src_path, dst_path, **kwargs):
+async def move(session, src_path, dst_path, **kwargs):
     """
         Move `src_path` to `dst_path`.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param src_path: source path to be moved
         :param dst_path: destination path
         :param overwrite: `bool`, determines whether to overwrite the destination
@@ -555,15 +608,15 @@ def move(session, src_path, dst_path, **kwargs):
     """
 
     request = MoveRequest(session, src_path, dst_path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def remove_trash(session, path, **kwargs):
+async def remove_trash(session, path, **kwargs):
     """
         Remove a trash resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource to be deleted
         :param force_async: forces the operation to be executed asynchronously
         :param fields: list of keys to be included in the response
@@ -576,15 +629,15 @@ def remove_trash(session, path, **kwargs):
     """
 
     request = DeleteTrashRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def publish(session, path, **kwargs):
+async def publish(session, path, **kwargs):
     """
         Make a resource public.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be published
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
@@ -596,15 +649,15 @@ def publish(session, path, **kwargs):
     """
 
     request = PublishRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def unpublish(session, path, **kwargs):
+async def unpublish(session, path, **kwargs):
     """
         Make a public resource private.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be unpublished
         :param fields: list of keys to be included in the response
         :param timeout: `float` or `tuple`, request timeout
@@ -616,17 +669,17 @@ def unpublish(session, path, **kwargs):
     """
 
     request = UnpublishRequest(session, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def save_to_disk(session, public_key, **kwargs):
+async def save_to_disk(session, public_key, **kwargs):
     """
         Saves a public resource to the disk.
         Returns the link to the operation if it's performed asynchronously,
         or a link to the resource otherwise.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param name: filename of the saved resource
         :param path: path to the copied resource in the public folder
@@ -642,15 +695,15 @@ def save_to_disk(session, public_key, **kwargs):
     """
 
     request = SaveToDiskRequest(session, public_key, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def get_public_meta(session, public_key, **kwargs):
+async def get_public_meta(session, public_key, **kwargs):
     """
         Get meta-information about a public resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to a resource in a public folder.
                      By specifying the key of the published folder in `public_key`,
@@ -670,15 +723,15 @@ def get_public_meta(session, public_key, **kwargs):
     """
 
     request = GetPublicMetaRequest(session, public_key, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def public_exists(session, public_key, **kwargs):
+async def public_exists(session, public_key, **kwargs):
     """
         Check whether the public resource exists.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource within the public folder
         :param timeout: `float` or `tuple`, request timeout
@@ -689,13 +742,13 @@ def public_exists(session, public_key, **kwargs):
         :returns: `bool`
     """
 
-    return _exists(get_public_meta, session, public_key, **kwargs)
+    return await _exists(get_public_meta, session, public_key, **kwargs)
 
-def public_listdir(session, public_key, **kwargs):
+async def public_listdir(session, public_key, **kwargs):
     """
         Get contents of a public directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource in the public folder.
                      By specifying the key of the published folder in `public_key`,
@@ -715,11 +768,11 @@ def public_listdir(session, public_key, **kwargs):
 
     return _listdir(get_public_meta, session, public_key, kwargs) # NOT A TYPO!
 
-def get_public_type(session, public_key, **kwargs):
+async def get_public_type(session, public_key, **kwargs):
     """
         Get public resource type.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource within the public folder
         :param timeout: `float` or `tuple`, request timeout
@@ -730,13 +783,13 @@ def get_public_type(session, public_key, **kwargs):
         :returns: "file" or "dir"
     """
 
-    return _get_type(get_public_meta, session, public_key, **kwargs)
+    return await _get_type(get_public_meta, session, public_key, **kwargs)
 
-def is_public_dir(session, public_key, **kwargs):
+async def is_public_dir(session, public_key, **kwargs):
     """
         Check whether the public resource is a public directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource within the public folder
         :param timeout: `float` or `tuple`, request timeout
@@ -748,15 +801,15 @@ def is_public_dir(session, public_key, **kwargs):
     """
 
     try:
-        return get_public_type(session, public_key, **kwargs) == "dir"
+        return (await get_public_type(session, public_key, **kwargs)) == "dir"
     except PathNotFoundError:
         return False
 
-def is_public_file(session, public_key, **kwargs):
+async def is_public_file(session, public_key, **kwargs):
     """
         Check whether the public resource is a public file.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource within the public folder
         :param timeout: `float` or `tuple`, request timeout
@@ -768,15 +821,15 @@ def is_public_file(session, public_key, **kwargs):
     """
 
     try:
-        return get_public_type(session, public_key, **kwargs) == "file"
+        return (await get_public_type(session, public_key, **kwargs)) == "file"
     except PathNotFoundError:
         return False
 
-def trash_listdir(session, path, **kwargs):
+async def trash_listdir(session, path, **kwargs):
     """
         Get contents of a trash resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the directory in the trash bin
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -793,11 +846,11 @@ def trash_listdir(session, path, **kwargs):
 
     return _listdir(get_trash_meta, session, path, kwargs) # NOT A TYPO!
 
-def get_trash_type(session, path, **kwargs):
+async def get_trash_type(session, path, **kwargs):
     """
         Get trash resource type.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -807,13 +860,13 @@ def get_trash_type(session, path, **kwargs):
         :returns: "file" or "dir"
     """
 
-    return _get_type(get_trash_meta, session, path, **kwargs)
+    return await _get_type(get_trash_meta, session, path, **kwargs)
 
-def is_trash_dir(session, path, **kwargs):
+async def is_trash_dir(session, path, **kwargs):
     """
         Check whether `path` is a trash directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -824,15 +877,15 @@ def is_trash_dir(session, path, **kwargs):
     """
 
     try:
-        return get_trash_type(session, path, **kwargs) == "dir"
+        return (await get_trash_type(session, path, **kwargs)) == "dir"
     except PathNotFoundError:
         return False
 
-def is_trash_file(session, path, **kwargs):
+async def is_trash_file(session, path, **kwargs):
     """
         Check whether `path` is a trash file.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
@@ -843,15 +896,15 @@ def is_trash_file(session, path, **kwargs):
     """
 
     try:
-        return get_trash_type(session, path, **kwargs) == "file"
+        return (await get_trash_type(session, path, **kwargs)) == "file"
     except PathNotFoundError:
         return False
 
-def get_public_resources(session, **kwargs):
+async def get_public_resources(session, **kwargs):
     """
         Get a list of public resources.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: maximum number of elements in the list
         :param preview_size: size of the file preview
@@ -867,15 +920,15 @@ def get_public_resources(session, **kwargs):
     """
 
     request = GetPublicResourcesRequest(session, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def patch(session, path, properties, **kwargs):
+async def patch(session, path, properties, **kwargs):
     """
         Update custom properties of a resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param properties: `dict`, custom properties to update
         :param fields: list of keys to be included in the response
@@ -888,15 +941,15 @@ def patch(session, path, properties, **kwargs):
     """
 
     request = PatchRequest(session, path, properties, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def get_files(session, **kwargs):
+async def get_files(session, **kwargs):
     """
         Get a flat list of all files (that doesn't include directories).
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: number of list elements to be included
         :param media_type: type of files to include in the list
@@ -914,9 +967,9 @@ def get_files(session, **kwargs):
 
     if kwargs.get("limit") is not None:
         request = FilesRequest(session, **kwargs)
-        request.send()
+        await request.send()
 
-        for i in request.process().items:
+        for i in (await request.process()).items:
             yield i
 
         return
@@ -928,7 +981,7 @@ def get_files(session, **kwargs):
 
     while True:
         counter = 0
-        for i in get_files(session, **kwargs):
+        async for i in await get_files(session, **kwargs):
             counter += 1
             yield i
 
@@ -937,11 +990,11 @@ def get_files(session, **kwargs):
 
         kwargs["offset"] += kwargs["limit"]
 
-def get_last_uploaded(session, **kwargs):
+async def get_last_uploaded(session, **kwargs):
     """
         Get the list of latest uploaded files sorted by upload date.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param limit: maximum number of elements in the list
         :param media_type: type of files to include in the list
         :param preview_size: size of the file preview
@@ -956,16 +1009,16 @@ def get_last_uploaded(session, **kwargs):
     """
 
     request = LastUploadedRequest(session, **kwargs)
-    request.send()
+    await request.send()
 
-    for i in request.process().items:
+    for i in (await request.process()).items:
         yield i
 
-def upload_url(session, url, path, **kwargs):
+async def upload_url(session, url, path, **kwargs):
     """
         Upload a file from URL.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param url: source URL
         :param path: destination path
         :param disable_redirects: `bool`, forbid redirects
@@ -979,15 +1032,15 @@ def upload_url(session, url, path, **kwargs):
     """
 
     request = UploadURLRequest(session, url, path, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process()
+    return await request.process()
 
-def get_public_download_link(session, public_key, **kwargs):
+async def get_public_download_link(session, public_key, **kwargs):
     """
         Get a download link for a public resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param path: relative path to the resource within the public folder
         :param fields: list of keys to be included in the response
@@ -1000,15 +1053,15 @@ def get_public_download_link(session, public_key, **kwargs):
     """
 
     request = GetPublicDownloadLinkRequest(session, public_key, **kwargs)
-    request.send()
+    await request.send()
 
-    return request.process().href
+    return (await request.process()).href
 
-def download_public(session, public_key, file_or_path, **kwargs):
+async def download_public(session, public_key, file_or_path, **kwargs):
     """
         Download the public resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the public resource
         :param file_or_path: destination path or file-like object
         :param path: relative path to the resource within the public folder
@@ -1041,12 +1094,12 @@ def download_public(session, public_key, file_or_path, **kwargs):
 
         file_position = file.tell()
 
-        def attempt():
+        async def attempt():
             temp_kwargs = dict(kwargs)
             temp_kwargs["n_retries"] = 0
             temp_kwargs["retry_interval"] = 0.0
 
-            link = get_public_download_link(session, public_key, **temp_kwargs)
+            link = await get_public_download_link(session, public_key, **temp_kwargs)
 
             temp_kwargs.pop("n_retries", None)
             temp_kwargs.pop("retry_interval", None)
@@ -1058,7 +1111,6 @@ def download_public(session, public_key, file_or_path, **kwargs):
                 timeout = settings.DEFAULT_TIMEOUT
 
             temp_kwargs["timeout"] = timeout
-            temp_kwargs.setdefault("stream", True)
 
             # Disable keep-alive by default, since the download server is random
             try:
@@ -1068,15 +1120,19 @@ def download_public(session, public_key, file_or_path, **kwargs):
 
             file.seek(file_position)
 
-            with contextlib.closing(session.get(link, **temp_kwargs)) as response:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        file.write(chunk)
+            async with session.get(link, **temp_kwargs) as response:
+                while True:
+                    chunk = await response.content.read(8192)
 
-                if response.status_code != 200:
-                    raise get_exception(response)
+                    if not chunk:
+                        break
 
-        auto_retry(attempt, n_retries, retry_interval)
+                    file.write(chunk)
+
+                if response.status != 200:
+                    raise await get_exception(response)
+
+        await auto_retry(attempt, n_retries, retry_interval)
     finally:
         if close_file and file is not None:
             file.close()

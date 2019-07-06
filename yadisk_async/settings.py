@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import aiohttp
+
 __all__ = ["DEFAULT_TIMEOUT", "DEFAULT_N_RETRIES", "DEFAULT_UPLOAD_TIMEOUT",
            "DEFAULT_UPLOAD_RETRY_INTERVAL"]
 
 # `tuple` of 2 numbers (`int` or float`), default timeout for requests.
 # First number is the connect timeout, the second one is the read timeout.
-DEFAULT_TIMEOUT = (10.0, 15.0)
+DEFAULT_TIMEOUT = aiohttp.ClientTimeout(sock_connect=10.0, sock_read=15.0)
 
 # `int`, default number of retries
 DEFAULT_N_RETRIES = 3

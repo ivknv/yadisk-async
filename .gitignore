@@ -2,5 +2,5 @@
 *.py[co]
 dist/
 build/
-yadisk.egg-info/
+yadisk_async.egg-info/
 docs/_build

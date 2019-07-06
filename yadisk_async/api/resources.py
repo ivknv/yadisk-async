@@ -24,7 +24,7 @@ class GetPublicResourcesRequest(APIRequest):
     """
         A request to get a list of public resources.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: maximum number of elements in the list
         :param preview_size: size of the file preview
@@ -70,7 +70,7 @@ class UnpublishRequest(APIRequest):
     """
         A request to make a public resource private.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be unpublished
         :param fields: list of keys to be included in the response
 
@@ -97,7 +97,7 @@ class GetDownloadLinkRequest(APIRequest):
     """
         A request to get a download link to a resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be downloaded
         :param fields: list of keys to be included in the response
 
@@ -174,7 +174,7 @@ class RestoreTrashRequest(APIRequest):
     """
         A request to restore trash.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource to be restored
         :param dst_path: destination path
         :param force_async: forces the operation to be executed asynchronously
@@ -217,7 +217,7 @@ class DeleteTrashRequest(APIRequest):
     """
         A request to delete a trash resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the trash resource to be deleted
         :param force_async: forces the operation to be executed asynchronously
         :param fields: list of keys to be included in the response
@@ -251,7 +251,7 @@ class LastUploadedRequest(APIRequest):
     """
         A request to get the list of latest uploaded files sorted by upload date.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param limit: maximum number of elements in the list
         :param media_type: type of files to include in the list
         :param preview_size: size of the file preview
@@ -300,7 +300,7 @@ class CopyRequest(APIRequest):
     """
         A request to copy a file or a directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param src_path: source path
         :param dst_path: destination path
         :param overwrite: if `True` the destination path can be overwritten,
@@ -342,7 +342,7 @@ class GetMetaRequest(APIRequest):
     """
         A request to get meta-information about a resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -400,7 +400,7 @@ class GetUploadLinkRequest(APIRequest):
     """
         A request to get an upload link.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to be uploaded at
         :param overwrite: `bool`, determines whether to overwrite the destination
         :param fields: list of keys to be included in the response
@@ -457,7 +457,7 @@ class PublishRequest(APIRequest):
     """
         A request to make a resource public.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be published
         :param fields: list of keys to be included in the response
 
@@ -484,7 +484,7 @@ class UploadURLRequest(APIRequest):
     """
         A request to upload a file from URL.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param url: source URL
         :param path: destination path
         :param disable_redirects: `bool`, forbid redirects
@@ -519,7 +519,7 @@ class DeleteRequest(APIRequest):
     """
         A request to delete a file or a directory.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource to be removed
         :param permanently: if `True`, the resource will be removed permanently,
                             otherwise, it will be just moved to the trash
@@ -560,7 +560,7 @@ class SaveToDiskRequest(APIRequest):
     """
         A request to save a public resource to the disk.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the resource
         :param name: filename of the saved resource
         :param path: path to the copied resource in the public folder
@@ -611,7 +611,7 @@ class GetPublicMetaRequest(APIRequest):
     """
         A request to get meta-information about a public resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the resource
         :param path: relative path to a resource in a public folder.
                      By specifying the key of the published folder in `public_key`,
@@ -672,7 +672,7 @@ class GetPublicDownloadLinkRequest(APIRequest):
     """
         A request to get a download link for a public resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param public_key: public key or public URL of the resource
         :param path: relative path to the resource within the public folder
         :param fields: list of keys to be included in the response
@@ -704,7 +704,7 @@ class MoveRequest(APIRequest):
     """
         A request to move a resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param src_path: source path to be moved
         :param dst_path: destination path
         :param force_async: forces the operation to be executed asynchronously
@@ -745,7 +745,7 @@ class FilesRequest(APIRequest):
     """
         A request to get a flat list of all files (that doesn't include directories).
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: number of list elements to be included
         :param media_type: type of files to include in the list
@@ -803,7 +803,7 @@ class PatchRequest(APIRequest):
     """
         A request to update custom properties of a resource.
 
-        :param session: an instance of :any:`requests.Session` with prepared headers
+        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
         :param path: path to the resource
         :param properties: `dict`, custom properties to update
         :param fields: list of keys to be included in the response
@@ -820,6 +820,7 @@ class PatchRequest(APIRequest):
                                             "properties": properties,
                                             "fields":     fields}, **kwargs)
     def prepare(self, *args, **kwargs):
+        return
         APIRequest.prepare(self, *args, **kwargs)
 
         self.request.body = self.data["body"]
@@ -827,7 +828,7 @@ class PatchRequest(APIRequest):
 
     def process_args(self, path, properties, fields):
         self.params["path"] = path
-        self.data["body"] = json.dumps({"custom_properties": properties}).encode("utf8")
+        self.data = json.dumps({"custom_properties": properties}).encode("utf8")
 
         if fields is not None:
             sub_map = {"embedded": "_embedded"}
