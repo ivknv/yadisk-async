@@ -1,4 +1,4 @@
-YaDisk
+YaDisk-async
 ======
 
 .. image:: https://img.shields.io/readthedocs/yadisk-async.svg
