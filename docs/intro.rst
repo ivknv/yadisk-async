@@ -173,6 +173,7 @@ Setting custom properties of files
 
 .. code:: python
 
+    import asyncio
     import yadisk_async
 
     async def main():
