@@ -40,6 +40,11 @@ class ResourcesTestCase(TestCase):
 
         self.path = os.environ.get("PYTHON_YADISK_TEST_ROOT")
 
+        # Get rid of 'disk:/' prefix in the path and make it start with a slash
+        # for consistency
+        if self.path.startswith("disk:/"):
+            self.path = posixpath.join("/", self.path[len("disk:/"):])
+
     def __del__(self):
         if self.yadisk is None:
             return
@@ -103,7 +108,7 @@ class ResourcesTestCase(TestCase):
         with self.assertRaises(yadisk_async.exceptions.WrongResourceTypeError):
             [i async for i in await self.yadisk.listdir(path)]
 
-        await self.yadisk.remove(path)
+        await self.yadisk.remove(path, permanently=True)
 
     def test_listdir_with_limits(self):
         names = ["dir1", "dir2", "dir3"]
@@ -175,18 +180,32 @@ class ResourcesTestCase(TestCase):
     @async_test
     async def test_permanent_remove(self):
         path = posixpath.join(self.path, "dir")
+        origin_path = "disk:" + path
 
         await self.yadisk.mkdir(path)
         await self.yadisk.remove(path, permanently=True)
-        self.assertFalse(await self.yadisk.trash_exists(path))
+
+        async for i in await self.yadisk.trash_listdir("/"):
+            self.assertFalse(i.origin_path == origin_path)
 
     @async_test
     async def test_restore_trash(self):
         path = posixpath.join(self.path, "dir")
+        origin_path = "disk:" + path
 
         await self.yadisk.mkdir(path)
         await self.yadisk.remove(path)
-        await self.yadisk.restore_trash("dir", path)
+
+        trash_path = None
+
+        async for i in await self.yadisk.trash_listdir("/"):
+            if i.origin_path == origin_path:
+                trash_path = i.path
+                break
+
+        self.assertTrue(trash_path is not None)
+
+        await self.yadisk.restore_trash(trash_path, path)
         self.assertTrue(await self.yadisk.exists(path))
         await self.yadisk.remove(path, permanently=True)
 
@@ -204,10 +223,22 @@ class ResourcesTestCase(TestCase):
     @async_test
     async def test_remove_trash(self):
         path = posixpath.join(self.path, "dir-to-remove")
+        origin_path = "disk:" + path
+
         await self.yadisk.mkdir(path)
         await self.yadisk.remove(path)
-        await self.yadisk.remove_trash("dir-to-remove")
-        self.assertFalse(await self.yadisk.trash_exists("dir-to-remove"))
+
+        trash_path = None
+
+        async for i in await self.yadisk.trash_listdir("/"):
+            if i.origin_path == origin_path:
+                trash_path = i.path
+                break
+
+        self.assertTrue(trash_path is not None)
+
+        await self.yadisk.remove_trash(trash_path)
+        self.assertFalse(await self.yadisk.trash_exists(trash_path))
 
     @async_test
     async def test_publish_unpublish(self):
