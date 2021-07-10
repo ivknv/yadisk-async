@@ -4,15 +4,15 @@ YaDisk-async
 .. image:: https://img.shields.io/readthedocs/yadisk-async.svg
    :alt: Read the Docs
    :target: https://yadisk-async.readthedocs.io/en/latest/
-   
+
 .. image:: https://img.shields.io/pypi/v/yadisk-async.svg
    :alt: PyPI
    :target: https://pypi.org/project/yadisk-async
-   
+
 .. image:: https://img.shields.io/aur/version/python-yadisk-async.svg
    :alt: AUR
    :target: https://aur.archlinux.org/packages/python-yadisk-async
-   
+
 YaDisk-async - это библиотека-клиент REST API Яндекс.Диска с поддержкой async/await.
 
 .. _Read the Docs (EN): http://yadisk-async.readthedocs.io
@@ -80,6 +80,12 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #2: https://github.com/ivknv/yadisk/issues/2
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
+.. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
+
+* **Release 1.3.1 (2021-07-10)**
+
+  * Исправлена ошибка :code:`AttributeError` в объекте :code:`SessionWithHeaders` (`PR #1`_)
+  * Исправлены тесты корзины
 
 * **Release 1.3.0 (2019-07-06)**
 

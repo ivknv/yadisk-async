@@ -80,6 +80,12 @@ Changelog
 .. _issue #2: https://github.com/ivknv/yadisk/issues/2
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
+.. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
+
+* **Release 1.3.1 (2021-07-10)**
+
+  * Fixed :code:`AttributeError` in :code:`SessionWithHeaders` (`PR #1`_)
+  * Fixed trash bin tests
 
 * **Release 1.3.0 (2019-07-06)**
 
