@@ -4,11 +4,11 @@ YaDisk-async
 .. image:: https://img.shields.io/readthedocs/yadisk-async.svg
    :alt: Read the Docs
    :target: https://yadisk-async.readthedocs.io/en/latest/
-   
+
 .. image:: https://img.shields.io/pypi/v/yadisk-async.svg
    :alt: PyPI
    :target: https://pypi.org/project/yadisk-async
-   
+
 .. image:: https://img.shields.io/aur/version/python-yadisk-async.svg
    :alt: AUR
    :target: https://aur.archlinux.org/packages/python-yadisk-async
@@ -81,6 +81,10 @@ Changelog
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
+
+* **Release 1.3.2 (2021-07-10)**
+
+  * Fixed :code:`__version__` having the old value
 
 * **Release 1.3.1 (2021-07-10)**
 

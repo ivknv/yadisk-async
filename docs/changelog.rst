@@ -8,6 +8,10 @@ Changelog
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
 
+* **Release 1.3.2 (2021-07-10)**
+
+  * Fixed `__version__` having the wrong value
+
 * **Release 1.3.1 (2021-07-10)**
 
   * Fixed `AttributeError` in `SessionWithHeaders` (`PR #1`_)
