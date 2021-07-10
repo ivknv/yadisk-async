@@ -35,13 +35,14 @@ if not os.environ.get("PYTHON_YADISK_APP_TOKEN"):
 if not os.environ.get("PYTHON_YADISK_TEST_ROOT"):
     raise ValueError("Environment variable PYTHON_YADISK_TEST_ROOT must be set")
 
+
 def async_test(f):
     def wrapper(*args, **kwargs):
-        coroutine = asyncio.coroutine(f)
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(coroutine(*args, **kwargs))
+        loop.run_until_complete(f(*args, **kwargs))
 
     return wrapper
+
 
 class ResourcesTestCase(TestCase):
     def __init__(self, *args, **kwargs):
@@ -64,7 +65,7 @@ class ResourcesTestCase(TestCase):
 
     @async_test
     async def test_get_meta(self):
-       self.assertIsInstance(await self.yadisk.get_meta(self.path), yadisk_async.objects.ResourceObject)
+        self.assertIsInstance(await self.yadisk.get_meta(self.path), yadisk_async.objects.ResourceObject)
 
     def test_listdir(self):
         names = ["dir1", "dir2", "dir3"]
