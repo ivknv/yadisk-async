@@ -3,7 +3,6 @@
 
 import asyncio
 import os
-import http3
 import random
 import tempfile
 
@@ -15,19 +14,6 @@ import yadisk_async.settings
 
 yadisk_async.settings.DEFAULT_N_RETRIES = 50
 yadisk_async.settings.DEFAULT_UPLOAD_N_RETRIES = 50
-
-original_send = http3.AsyncClient.send
-
-async def patched_send(self, *args, **kwargs):
-    # Fake a random server error
-    if random.randint(1, 5) == 1:
-        raise yadisk_async.exceptions.InternalServerError()
-
-    response = await original_send(self, *args, **kwargs)
-
-    return response
-
-http3.AsyncClient.send = patched_send
 
 if not os.environ.get("PYTHON_YADISK_APP_TOKEN"):
     raise ValueError("Environment variable PYTHON_YADISK_APP_TOKEN must be set")
