@@ -15,13 +15,6 @@ import yadisk_async.settings
 yadisk_async.settings.DEFAULT_N_RETRIES = 50
 yadisk_async.settings.DEFAULT_UPLOAD_N_RETRIES = 50
 
-if not os.environ.get("PYTHON_YADISK_APP_TOKEN"):
-    raise ValueError("Environment variable PYTHON_YADISK_APP_TOKEN must be set")
-
-if not os.environ.get("PYTHON_YADISK_TEST_ROOT"):
-    raise ValueError("Environment variable PYTHON_YADISK_TEST_ROOT must be set")
-
-
 def async_test(f):
     def wrapper(*args, **kwargs):
         loop = asyncio.get_event_loop()
@@ -29,12 +22,17 @@ def async_test(f):
 
     return wrapper
 
-
 class ResourcesTestCase(TestCase):
     def __init__(self, *args, **kwargs):
         self.yadisk = None
 
         TestCase.__init__(self, *args, **kwargs)
+
+        if not os.environ.get("PYTHON_YADISK_APP_TOKEN"):
+            raise ValueError("Environment variable PYTHON_YADISK_APP_TOKEN must be set")
+
+        if not os.environ.get("PYTHON_YADISK_TEST_ROOT"):
+            raise ValueError("Environment variable PYTHON_YADISK_TEST_ROOT must be set")
 
         self.yadisk = yadisk_async.YaDisk(os.environ.get("PYTHON_YADISK_APP_ID"),
                                           os.environ.get("PYTHON_YADISK_APP_SECRET"),
