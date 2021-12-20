@@ -346,6 +346,12 @@ class YaDisk(object):
             :param dst_path: destination path
             :param overwrite: if `True`, the resource will be overwritten if it already exists,
                               an error will be raised otherwise
+            :param fake_extension: if `True` appended to the file extension `.tmp` after a successful upload,
+                              the added extension is removed.
+                              Allows to work around the bug with slow uploading if the file has the extension
+                              *.zip, *.db, *.mp4, etc.
+            :param func_progress: `func(filesize, upload_size)` A callable function that is passed the file
+                              size and the size of the uploaded data
             :param fields: list of keys to be included in the response
             :param timeout: `float` or `tuple`, request timeout
             :param headers: `dict` or `None`, additional request headers

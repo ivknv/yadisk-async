@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import io
+import aiofiles
+from typing import Callable
 
 from ..api import CopyRequest, GetDownloadLinkRequest, GetMetaRequest
 from ..api import GetUploadLinkRequest, MkdirRequest, DeleteRequest, GetTrashRequest
@@ -444,7 +446,7 @@ class UnclosableFile(io.IOBase):
     def writelines(self, *args, **kwargs):
         return self.file.writelines(*args, **kwargs)
 
-async def upload(session, file_or_path, dst_path, **kwargs):
+async def upload(session, file_or_path, dst_path, func_progress: Callable[[int, int], None] = None, **kwargs):
     """
         Upload a file to disk.
 
@@ -453,6 +455,12 @@ async def upload(session, file_or_path, dst_path, **kwargs):
         :param dst_path: destination path
         :param overwrite: if `True`, the resource will be overwritten if it already exists,
                           an error will be raised otherwise
+        :param fake_extension: if `True` appended to the file extension `.tmp` after a successful upload,
+                              the added extension is removed.
+                              Allows to work around the bug with slow uploading if the file has the extension
+                              *.zip, *.db, *.mp4, etc.
+        :param func_progress: `func(filesize, upload_size)` A callable function that is passed the file
+                              size and the size of the uploaded data
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
         :param n_retries: `int`, maximum number of retries
@@ -478,18 +486,36 @@ async def upload(session, file_or_path, dst_path, **kwargs):
 
     kwargs["timeout"] = timeout
 
+    fake_extension = kwargs.pop('fake_extension', False)
+
+    if fake_extension:
+        dst_path = f'{dst_path}.tmp'
+
     file = None
     close_file = False
 
     try:
         if isinstance(file_or_path, (str, bytes)):
             close_file = True
-            file = open(file_or_path, "rb")
+            file = await aiofiles.open(file_or_path, "rb")
         else:
             close_file = False
             file = file_or_path
 
-        file_position = file.tell()
+        file_position = await file.tell()
+        await file.seek(0, 2)
+        size = await file.tell()
+        chunk_size = int(round(size / 100))
+
+        async def file_sender(file_object, chunk_size):
+            chunk = await file_object.read(chunk_size)
+            progress = chunk_size
+            while chunk:
+                if func_progress:
+                    func_progress(size, progress)
+                yield chunk
+                chunk = await file_object.read(chunk_size)
+                progress += chunk_size
 
         async def attempt():
             temp_kwargs = dict(kwargs)
@@ -508,18 +534,19 @@ async def upload(session, file_or_path, dst_path, **kwargs):
             except KeyError:
                 temp_kwargs["headers"] = {"Connection": "close"}
 
-            file.seek(file_position)
+            await file.seek(file_position)
 
-            # UnclosableFile is used here to prevent aiohttp from closing the file
-            # after uploading it
-            async with session.put(link, data=UnclosableFile(file), **temp_kwargs) as response:
+            async with session.put(link, data=file_sender(file, chunk_size), **temp_kwargs) as response:
                 if response.status != 201:
                     raise await get_exception(response)
 
         await auto_retry(attempt, n_retries, retry_interval)
+
+        if fake_extension:
+            await move(session, dst_path, dst_path[:-4], overwrite=True, **kwargs)
     finally:
         if close_file and file is not None:
-            file.close()
+            await file.close()
 
 async def get_trash_meta(session, path, **kwargs):
     """
