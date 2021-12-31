@@ -19,9 +19,10 @@ yadisk_async.settings.DEFAULT_UPLOAD_N_RETRIES = 50
 
 __all__ = ["YaDiskTestCase"]
 
+loop = None
+
 def async_test(f):
     def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
         loop.run_until_complete(f(*args, **kwargs))
 
     return wrapper
@@ -38,10 +39,6 @@ class YaDiskTestCase(TestCase):
         if not os.environ.get("PYTHON_YADISK_TEST_ROOT"):
             raise ValueError("Environment variable PYTHON_YADISK_TEST_ROOT must be set")
 
-        self.yadisk = yadisk_async.YaDisk(os.environ.get("PYTHON_YADISK_APP_ID"),
-                                          os.environ.get("PYTHON_YADISK_APP_SECRET"),
-                                          os.environ.get("PYTHON_YADISK_APP_TOKEN"))
-
         self.path = os.environ.get("PYTHON_YADISK_TEST_ROOT")
 
         # Get rid of 'disk:/' prefix in the path and make it start with a slash
@@ -49,53 +46,64 @@ class YaDiskTestCase(TestCase):
         if self.path.startswith("disk:/"):
             self.path = posixpath.join("/", self.path[len("disk:/"):])
 
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+
+        global loop
+        loop = self.loop
+
+        self.yadisk = yadisk_async.YaDisk(os.environ.get("PYTHON_YADISK_APP_ID"),
+                                          os.environ.get("PYTHON_YADISK_APP_SECRET"),
+                                          os.environ.get("PYTHON_YADISK_APP_TOKEN"))
+
     def __del__(self):
         if self.yadisk is None:
             return
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.yadisk.close())
+        self.loop.run_until_complete(self.yadisk.close())
 
     @async_test
     async def test_get_meta(self):
         self.assertIsInstance(await self.yadisk.get_meta(self.path), yadisk_async.objects.ResourceObject)
 
-    def test_listdir(self):
+    @async_test
+    async def test_listdir(self):
         names = ["dir1", "dir2", "dir3"]
         paths = [posixpath.join(self.path, name) for name in names]
         mkdir_tasks = [self.yadisk.mkdir(path) for path in paths]
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(*mkdir_tasks))
+        await asyncio.gather(*mkdir_tasks)
 
         async def get_result():
             return [i.name async for i in await self.yadisk.listdir(self.path)]
 
-        result = loop.run_until_complete(get_result())
+        result = await get_result()
 
         remove_tasks = [self.yadisk.remove(path, permanently=True) for path in paths]
 
-        loop.run_until_complete(asyncio.gather(*remove_tasks))
+        await asyncio.gather(*remove_tasks)
 
         self.assertEqual(result, names)
 
-    def test_listdir_fields(self):
+    @async_test
+    async def test_listdir_fields(self):
         names = ["dir1", "dir2", "dir3"]
         paths = [posixpath.join(self.path, name) for name in names]
         mkdir_tasks = [self.yadisk.mkdir(path) for path in paths]
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(*mkdir_tasks))
+        await asyncio.gather(*mkdir_tasks)
 
         async def get_result():
             return [(i.name, i.type, i.file)
                     async for i in await self.yadisk.listdir(self.path, fields=["name", "type"])]
 
-        result = loop.run_until_complete(get_result())
+        result = await get_result()
 
         remove_tasks = [self.yadisk.remove(path, permanently=True) for path in paths]
 
-        loop.run_until_complete(asyncio.gather(*remove_tasks))
+        await asyncio.gather(*remove_tasks)
 
         self.assertEqual(result, [(name, "dir", None) for name in names])
 
@@ -114,26 +122,27 @@ class YaDiskTestCase(TestCase):
 
         await self.yadisk.remove(path, permanently=True)
 
-    def test_listdir_with_limits(self):
+    @async_test
+    async def test_listdir_with_limits(self):
         names = ["dir1", "dir2", "dir3"]
         paths = [posixpath.join(self.path, name) for name in names]
         mkdir_tasks = [self.yadisk.mkdir(path) for path in paths]
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(*mkdir_tasks))
+        await asyncio.gather(*mkdir_tasks)
 
         async def get_result():
             return [i.name async for i in await self.yadisk.listdir(self.path, limit=1)]
 
-        result = loop.run_until_complete(get_result())
+        result = await get_result()
 
         remove_tasks = [self.yadisk.remove(path, permanently=True) for path in paths]
 
-        loop.run_until_complete(asyncio.gather(*remove_tasks))
+        await asyncio.gather(*remove_tasks)
 
         self.assertEqual(result, names)
 
-    def test_mkdir_and_exists(self):
+    @async_test
+    async def test_mkdir_and_exists(self):
         names = ["dir1", "dir2", "dir3"]
         paths = [posixpath.join(self.path, name) for name in names]
 
@@ -146,8 +155,7 @@ class YaDiskTestCase(TestCase):
 
         tasks = [check_existence(path) for path in paths]
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(*tasks))
+        await asyncio.gather(*tasks)
 
     @async_test
     async def test_upload_and_download(self):
@@ -273,27 +281,29 @@ class YaDiskTestCase(TestCase):
         except yadisk_async.exceptions.PathNotFoundError:
             pass
 
-    def test_is_operation_link(self):
+    @async_test
+    async def test_is_operation_link(self):
         self.assertTrue(is_operation_link("https://cloud-api.yandex.net/v1/disk/operations/123asd"))
         self.assertTrue(is_operation_link("http://cloud-api.yandex.net/v1/disk/operations/123asd"))
         self.assertFalse(is_operation_link("https://cloud-api.yandex.net/v1/disk/operation/1283718"))
         self.assertFalse(is_operation_link("https://asd8iaysd89asdgiu"))
         self.assertFalse(is_operation_link("http://asd8iaysd89asdgiu"))
 
-    def test_get_operation_status_request_url(self):
+    @async_test
+    async def test_get_operation_status_request_url(self):
         request = GetOperationStatusRequest(
-            self.yadisk.make_session(),
+            self.yadisk.get_session(),
             "https://cloud-api.yandex.net/v1/disk/operations/123asd")
         self.assertTrue(is_operation_link(request.url))
 
         request = GetOperationStatusRequest(
-            self.yadisk.make_session(),
+            self.yadisk.get_session(),
             "http://cloud-api.yandex.net/v1/disk/operations/123asd")
         self.assertTrue(is_operation_link(request.url))
         self.assertTrue(request.url.startswith("https://"))
 
         request = GetOperationStatusRequest(
-            self.yadisk.make_session(),
+            self.yadisk.get_session(),
             "https://asd8iaysd89asdgiu")
         self.assertTrue(is_operation_link(request.url))
         self.assertTrue(request.url.startswith("https://"))
