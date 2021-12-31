@@ -11,9 +11,13 @@ from unittest import TestCase
 from io import BytesIO
 
 import yadisk_async.settings
+from yadisk_async.common import is_operation_link
+from yadisk_async.api.operations import GetOperationStatusRequest
 
 yadisk_async.settings.DEFAULT_N_RETRIES = 50
 yadisk_async.settings.DEFAULT_UPLOAD_N_RETRIES = 50
+
+__all__ = ["YaDiskTestCase"]
 
 def async_test(f):
     def wrapper(*args, **kwargs):
@@ -22,7 +26,7 @@ def async_test(f):
 
     return wrapper
 
-class ResourcesTestCase(TestCase):
+class YaDiskTestCase(TestCase):
     def __init__(self, *args, **kwargs):
         self.yadisk = None
 
@@ -268,3 +272,28 @@ class ResourcesTestCase(TestCase):
             await self.yadisk.public_listdir("any value here", path="any value here")
         except yadisk_async.exceptions.PathNotFoundError:
             pass
+
+    def test_is_operation_link(self):
+        self.assertTrue(is_operation_link("https://cloud-api.yandex.net/v1/disk/operations/123asd"))
+        self.assertTrue(is_operation_link("http://cloud-api.yandex.net/v1/disk/operations/123asd"))
+        self.assertFalse(is_operation_link("https://cloud-api.yandex.net/v1/disk/operation/1283718"))
+        self.assertFalse(is_operation_link("https://asd8iaysd89asdgiu"))
+        self.assertFalse(is_operation_link("http://asd8iaysd89asdgiu"))
+
+    def test_get_operation_status_request_url(self):
+        request = GetOperationStatusRequest(
+            self.yadisk.make_session(),
+            "https://cloud-api.yandex.net/v1/disk/operations/123asd")
+        self.assertTrue(is_operation_link(request.url))
+
+        request = GetOperationStatusRequest(
+            self.yadisk.make_session(),
+            "http://cloud-api.yandex.net/v1/disk/operations/123asd")
+        self.assertTrue(is_operation_link(request.url))
+        self.assertTrue(request.url.startswith("https://"))
+
+        request = GetOperationStatusRequest(
+            self.yadisk.make_session(),
+            "https://asd8iaysd89asdgiu")
+        self.assertTrue(is_operation_link(request.url))
+        self.assertTrue(request.url.startswith("https://"))
