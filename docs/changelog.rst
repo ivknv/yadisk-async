@@ -8,6 +8,17 @@ Changelog
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
 
+* **Release 1.3.3 (2021-12-31)**
+
+  * Fixed an issue where `http://` links were not recognized as operation links
+    (they were assumed to always be `https://`, since all the other
+    requests are always HTTPS).
+    Occasionally, Yandex.Disk can for some reason return an `http://` link
+    to an asynchronous operation instead of `https://`.
+    Both links are now recognized correctly and an `https://` version will
+    always be used by `get_operation_status()`, regardless of which one
+    Yandex.Disk returned.
+
 * **Release 1.3.2 (2021-07-10)**
 
   * Fixed `__version__` having the wrong value

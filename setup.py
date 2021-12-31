@@ -12,7 +12,7 @@ with codecs.open(os.path.join(module_dir, "README.rst"), encoding="utf8") as f:
     long_description = f.read()
 
 setup(name="yadisk-async",
-      version="1.3.2",
+      version="1.3.3",
       packages=find_packages(exclude=("tests",)),
       description="Библиотека-клиент REST API Яндекс.Диска с поддержкой async/await / Yandex.Disk REST API client library with async/await support",
       long_description=long_description,
