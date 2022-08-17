@@ -5,10 +5,10 @@ try:
 except ImportError:
     from urllib import urlencode
 
-from .disk import get_disk_info
+from .operations import get_operation_status
 from ..session import SessionWithHeaders
 from ..api import GetTokenRequest, RefreshTokenRequest, RevokeTokenRequest
-from ..exceptions import UnauthorizedError
+from ..exceptions import UnauthorizedError, OperationNotFoundError
 
 __all__ = ["check_token", "get_auth_url", "get_code_url", "get_token",
            "refresh_token", "revoke_token"]
@@ -22,11 +22,17 @@ async def check_token(session, **kwargs):
         :returns: `bool`
     """
 
+    # Any ID will do, doesn't matter whether it exists or not
+    fake_operation_id = "0000"
+
     try:
-        await get_disk_info(session, **kwargs)
+        # get_operation_status() doesn't require any permissions, unlike most other requests
+        await get_operation_status(session, fake_operation_id, **kwargs)
         return True
     except UnauthorizedError:
         return False
+    except OperationNotFoundError:
+        return True
 
 def get_auth_url(client_id, **kwargs):
     """
