@@ -81,6 +81,12 @@ Changelog
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
+.. _issue #23: https://github.com/ivknv/yadisk/issues/23
+
+* **Release 1.3.4 (2022-08-17)**
+
+  * Fixed a bug in :code:`check_token()`: could throw :code:`ForbiddenError` if
+    the application lacks necessary permissions (`issue #23`_).
 
 * **Release 1.3.3 (2021-12-31)**
 

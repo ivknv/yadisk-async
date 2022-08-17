@@ -81,6 +81,12 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #4: https://github.com/ivknv/yadisk/issues/4
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
+.. _issue #23: https://github.com/ivknv/yadisk/issues/23
+
+* **Release 1.3.4 (2022-08-17)**
+
+  * Исправлен баг в :code:`check_token()`: функция могла вызвать :code:`ForbiddenError`,
+    если у приложения недостатчно прав (`issue #23`_).
 
 * **Release 1.3.3 (2021-12-31)**
 
