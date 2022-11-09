@@ -310,7 +310,7 @@ class YaDiskTestCase(TestCase):
 
     @async_test
     async def test_is_file(self):
-
+        # See https://github.com/ivknv/yadisk-async/pull/6
         buf1 = BytesIO()
         
         buf1.write(b"0" * 1024**2)
