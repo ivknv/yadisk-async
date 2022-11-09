@@ -307,3 +307,26 @@ class YaDiskTestCase(TestCase):
             "https://asd8iaysd89asdgiu")
         self.assertTrue(is_operation_link(request.url))
         self.assertTrue(request.url.startswith("https://"))
+
+    @async_test
+    async def test_is_file(self):
+
+        buf1 = BytesIO()
+        buf2 = tempfile.NamedTemporaryFile("w+b")
+
+        orig_close = buf1.close
+
+        def wrapper():
+            raise BaseException("WHERERA")
+            orig_close()
+
+        buf1.close = wrapper
+
+        buf1.write(b"0" * 1024**2)
+        buf1.seek(0)
+
+        path = posixpath.join(self.path, "zeroes.txt")
+
+        await self.yadisk.upload(buf1, path, overwrite=True, n_retries=50)
+        self.assertTrue(await self.yadisk.is_file(path))
+        await self.yadisk.remove(path, permanently=True)

@@ -205,7 +205,7 @@ async def _get_type(get_meta_function, session, *args, **kwargs):
     kwargs = dict(kwargs)
     kwargs["limit"] = 0
 
-    return await get_meta_function(session, *args, **kwargs).type
+    return (await get_meta_function(session, *args, **kwargs)).type
 
 async def get_type(session, path, **kwargs):
     """
