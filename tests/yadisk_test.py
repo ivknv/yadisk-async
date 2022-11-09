@@ -312,16 +312,7 @@ class YaDiskTestCase(TestCase):
     async def test_is_file(self):
 
         buf1 = BytesIO()
-        buf2 = tempfile.NamedTemporaryFile("w+b")
-
-        orig_close = buf1.close
-
-        def wrapper():
-            raise BaseException("WHERERA")
-            orig_close()
-
-        buf1.close = wrapper
-
+        
         buf1.write(b"0" * 1024**2)
         buf1.seek(0)
 
