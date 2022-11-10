@@ -82,6 +82,12 @@ Changelog
 .. _issue #7: https://github.com/ivknv/yadisk/issues/7
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
+.. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
+
+* **Release 1.3.5 (2022-11-10)**
+
+  * Fixed a bug in :code:`is_file()` and :code:`is_dir()`: a typo was causing
+    :code:`AttributeError` (`PR #6`_).
 
 * **Release 1.3.4 (2022-08-17)**
 
