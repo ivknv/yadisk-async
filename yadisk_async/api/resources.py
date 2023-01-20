@@ -819,13 +819,6 @@ class PatchRequest(APIRequest):
         APIRequest.__init__(self, session, {"path":       path,
                                             "properties": properties,
                                             "fields":     fields}, **kwargs)
-    def prepare(self, *args, **kwargs):
-        return
-        APIRequest.prepare(self, *args, **kwargs)
-
-        self.request.body = self.data["body"]
-        self.request.headers["Content-Length"] = len(self.request.body)
-
     def process_args(self, path, properties, fields):
         self.params["path"] = ensure_path_has_schema(path)
         self.data = json.dumps({"custom_properties": properties}).encode("utf8")
