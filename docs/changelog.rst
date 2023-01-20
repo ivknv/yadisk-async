@@ -9,7 +9,7 @@ Changelog
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
-.. _issue #26: https://github.com/ivknv/yadisk/issues/23
+.. _issue #26: https://github.com/ivknv/yadisk/issues/26
 
 * **Release 1.3.6 (2023-01-20)**
 
