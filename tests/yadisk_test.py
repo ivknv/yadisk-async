@@ -11,7 +11,7 @@ from unittest import TestCase
 from io import BytesIO
 
 import yadisk_async.settings
-from yadisk_async.common import is_operation_link
+from yadisk_async.common import is_operation_link, ensure_path_has_schema
 from yadisk_async.api.operations import GetOperationStatusRequest
 
 yadisk_async.settings.DEFAULT_N_RETRIES = 50
@@ -312,7 +312,7 @@ class YaDiskTestCase(TestCase):
     async def test_is_file(self):
         # See https://github.com/ivknv/yadisk-async/pull/6
         buf1 = BytesIO()
-        
+
         buf1.write(b"0" * 1024**2)
         buf1.seek(0)
 
@@ -321,3 +321,12 @@ class YaDiskTestCase(TestCase):
         await self.yadisk.upload(buf1, path, overwrite=True, n_retries=50)
         self.assertTrue(await self.yadisk.is_file(path))
         await self.yadisk.remove(path, permanently=True)
+
+    def test_ensure_path_has_schema(self):
+        # See https://github.com/ivknv/yadisk/issues/26 for more details
+
+        self.assertEqual(ensure_path_has_schema("disk:"), "disk:/disk:")
+        self.assertEqual(ensure_path_has_schema("trash:", default_schema="trash"), "trash:/trash:")
+        self.assertEqual(ensure_path_has_schema("/asd:123"), "disk:/asd:123")
+        self.assertEqual(ensure_path_has_schema("/asd:123", "trash"), "trash:/asd:123")
+        self.assertEqual(ensure_path_has_schema("example/path"), "disk:/example/path")
