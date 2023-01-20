@@ -83,6 +83,13 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _PR #1: https://github.com/ivknv/yadisk-async/pull/1
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
+.. _issue #26: https://github.com/ivknv/yadisk/issues/26
+
+* **Release 1.3.6 (2023-01-20)**
+
+  * Исправлено `issue #26`_: символ ':' в именах файлов приводит к
+    :code:`BadRequestError`. Это поведение вызвано работой самого REST API
+    Яндекс.Диска, но было исправлено на уровне библиотеки.
 
 * **Release 1.3.5 (2022-11-10)**
 
