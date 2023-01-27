@@ -22,7 +22,7 @@ class APIRequest:
 
         :param session: an instance of :any:`aiohttp.ClientSession`
         :param args: `dict` of arguments, that will be passed to `process_args`
-        :param timeout: `float` or `tuple`, request timeout
+        :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
         :param headers: `dict` or `None`, additional request headers
         :param n_retries: `int`, maximum number of retries
         :param retry_interval: delay between retries in seconds
@@ -31,7 +31,7 @@ class APIRequest:
         :ivar url: `str`, request URL
         :ivar method: `str`, request method
         :ivar content_type: `str`, Content-Type header ("application/x-www-form-urlencoded" by default)
-        :ivar timeout: `float` or `tuple`, request timeout
+        :ivar timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
         :ivar n_retries: `int`, maximum number of retries
         :ivar success_codes: `list`-like, list of response codes that indicate request's success
         :ivar retry_interval: `float`, delay between retries in seconds

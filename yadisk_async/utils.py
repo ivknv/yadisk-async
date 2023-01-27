@@ -11,7 +11,7 @@ from . import settings
 
 from typing import Optional, Union, TypeVar
 
-from .compat import Callable
+from .compat import Callable, Awaitable, TimeoutError
 
 __all__ = ["get_exception", "auto_retry"]
 
@@ -69,7 +69,7 @@ async def get_exception(response: aiohttp.client.ClientResponse) -> YaDiskError:
 
 T = TypeVar("T")
 
-async def auto_retry(func: Callable[[], T],
+async def auto_retry(func: Callable[[], Union[T, Awaitable[T]]],
                      n_retries: Optional[int] = None,
                      retry_interval: Optional[Union[int, float]] = None) -> T:
     """
@@ -95,7 +95,7 @@ async def auto_retry(func: Callable[[], T],
                 return await func()
             else:
                 return func()
-        except (aiohttp.ClientError, RetriableYaDiskError) as e:
+        except (aiohttp.ClientError, TimeoutError, RetriableYaDiskError) as e:
             if i == n_retries:
                 raise e
 

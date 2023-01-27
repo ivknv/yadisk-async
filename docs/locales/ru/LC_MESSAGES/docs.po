@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: YaDisk 1.3.5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-01-28 02:39+0500\n"
+"POT-Creation-Date: 2023-01-28 04:03+0500\n"
 "PO-Revision-Date: 2018-01-20 15:41+0500\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -485,8 +485,8 @@ msgstr "токен, подлежащий проверке, то же самое,
 #: yadisk_async.yadisk.YaDisk.unpublish:5 yadisk_async.yadisk.YaDisk.upload:8
 #: yadisk_async.yadisk.YaDisk.upload_by_link:7
 #: yadisk_async.yadisk.YaDisk.upload_url:7
-msgid "`float` or `tuple`, request timeout"
-msgstr "`float` или `tuple`, таймаут запроса"
+msgid "`float` or :any:`aiohttp.ClientTimeout`, request timeout"
+msgstr "`float` или :any:`aiohttp.ClientTimeout`, таймаут запроса"
 
 #: of yadisk_async.api.api_request.APIRequest:6
 #: yadisk_async.objects.resources.OperationLinkObject.get_status:5
@@ -3752,3 +3752,7 @@ msgstr "идентификатор операции или ссылка на н�
 #: of yadisk_async.api.operations.GetOperationStatusRequest:7
 msgid ":any:`OperationStatusObject`"
 msgstr ""
+
+#~ msgid "`float` or `tuple`, request timeout"
+#~ msgstr "`float` или `tuple`, таймаут запроса"
+

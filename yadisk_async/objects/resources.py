@@ -166,7 +166,7 @@ class OperationLinkObject(LinkObject):
             Get operation status.
 
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -247,7 +247,7 @@ class ResourceObjectMethodsMixin:
             :param preview_crop: `bool`, cut the preview to the size specified in the `preview_size`
             :param sort: `str`, field to be used as a key to sort children resources
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -279,7 +279,7 @@ class ResourceObjectMethodsMixin:
             :param preview_size: file preview size
             :param preview_crop: `bool`, allow preview crop
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -306,7 +306,7 @@ class ResourceObjectMethodsMixin:
             Check whether resource exists.
 
             :param relative_path: `str` or `None`, relative path from the resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -332,7 +332,7 @@ class ResourceObjectMethodsMixin:
             Get resource type.
 
             :param relative_path: relative path from the resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -359,7 +359,7 @@ class ResourceObjectMethodsMixin:
             Check whether resource is a directory.
 
             :param relative_path: relative path from the resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -385,7 +385,7 @@ class ResourceObjectMethodsMixin:
             Check whether resource is a file.
 
             :param relative_path: relative path from the resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -416,7 +416,7 @@ class ResourceObjectMethodsMixin:
             :param preview_size: size of the file preview
             :param preview_crop: `bool`, cut the preview to the size specified in the `preview_size`
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -448,7 +448,7 @@ class ResourceObjectMethodsMixin:
             :param preview_size: size of the file preview
             :param preview_crop: `bool`, cut the preview to the size specified in the `preview_size`
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -478,7 +478,7 @@ class ResourceObjectMethodsMixin:
             :param relative_path: `str` or `None`, relative path to the resource
             :param overwrite: `bool`, determines whether to overwrite the destination
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -513,7 +513,7 @@ class ResourceObjectMethodsMixin:
             :param relative_path: `str` or `None`, destination path relative to the resource
             :param overwrite: if `True`, the resource will be overwritten if it already exists,
                               an error will be raised otherwise
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -548,7 +548,7 @@ class ResourceObjectMethodsMixin:
             :param relative_path: `str` or `None`, destination path relative to the resource
             :param disable_redirects: `bool`, forbid redirects
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -580,7 +580,7 @@ class ResourceObjectMethodsMixin:
 
             :param relative_path: `str` or `None`, path relative to the resource
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -625,7 +625,7 @@ class ResourceObjectMethodsMixin:
 
             :param relative_path: `str` or `None`, source path relative to the resource
             :param dst_path_or_file: destination path or file-like object
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -680,7 +680,7 @@ class ResourceObjectMethodsMixin:
             :param relative_path: `str` or `None`, path relative to the resource
             :param properties: `dict`, custom properties to update
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -716,7 +716,7 @@ class ResourceObjectMethodsMixin:
 
             :param relative_path: `str` or `None`, relative path to the resource to be published
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -745,7 +745,7 @@ class ResourceObjectMethodsMixin:
 
             :param relative_path: `str` or `None`, relative path to the resource to be unpublished
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -774,7 +774,7 @@ class ResourceObjectMethodsMixin:
 
             :param relative_path: `str` or `None`, relative path to the directory to be created
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -809,7 +809,7 @@ class ResourceObjectMethodsMixin:
             :param md5: `str`, MD5 hash of the file to remove
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -856,7 +856,7 @@ class ResourceObjectMethodsMixin:
             :param overwrite: `bool`, determines whether to overwrite the destination
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -907,7 +907,7 @@ class ResourceObjectMethodsMixin:
             :param overwrite: `bool`, determines whether to overwrite the destination
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -966,7 +966,7 @@ class ResourceObjectMethodsMixin:
                               otherwise, an error will be raised
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1399,7 +1399,7 @@ class TrashResourceObject(ResourceObject):
             :param preview_crop: `bool`, cut the preview to the size specified in the `preview_size`
             :param sort: `str`, field to be used as a key to sort children resources
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1426,7 +1426,7 @@ class TrashResourceObject(ResourceObject):
             Check whether the trash resource exists.
 
             :param relative_path: `str` or `None`, relative path to the trash resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1452,7 +1452,7 @@ class TrashResourceObject(ResourceObject):
             Get trash resource type.
 
             :param relative_path: `str` or `None`, relative path to the trash resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1479,7 +1479,7 @@ class TrashResourceObject(ResourceObject):
             Check whether resource is a trash directory.
 
             :param relative_path: `str` or `None`, relative path to the trash resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1505,7 +1505,7 @@ class TrashResourceObject(ResourceObject):
             Check whether resource is a trash file.
 
             :param relative_path: `str` or `None`, relative path to the trash resource
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1536,7 +1536,7 @@ class TrashResourceObject(ResourceObject):
             :param preview_size: size of the file preview
             :param preview_crop: `bool`, cut the preview to the size specified in the `preview_size`
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1566,7 +1566,7 @@ class TrashResourceObject(ResourceObject):
             :param relative_path: `str` or `None`, relative path to the trash resource to be deleted
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
@@ -1614,7 +1614,7 @@ class TrashResourceObject(ResourceObject):
             :param overwrite: `bool`, determines whether the destination can be overwritten
             :param force_async: forces the operation to be executed asynchronously
             :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
+            :param timeout: `float` or :any:`aiohttp.ClientTimeout`, request timeout
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
