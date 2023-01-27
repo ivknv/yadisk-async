@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 
-import collections
 import json
 
 from .api_request import APIRequest
-from ..objects import LinkObject, PublicResourcesListObject, TrashResourceObject
+from ..objects import PublicResourcesListObject, TrashResourceObject
 from ..objects import FilesResourceListObject, LastUploadedResourceListObject
 from ..objects import ResourceObject, ResourceUploadLinkObject, PublicResourceObject
-from ..objects import OperationLinkObject
+from ..objects import OperationLinkObject, ResourceLinkObject, ResourceDownloadLinkObject
 from ..common import is_operation_link, ensure_path_has_schema
+from ..exceptions import InvalidResponseError
+
+from ..compat import Iterable, Dict, List
+from typing import Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import aiohttp
+    from ..yadisk import YaDisk
 
 __all__ = ["GetPublicResourcesRequest", "UnpublishRequest", "GetDownloadLinkRequest",
            "GetTrashRequest", "RestoreTrashRequest", "DeleteTrashRequest",
@@ -17,14 +24,16 @@ __all__ = ["GetPublicResourcesRequest", "UnpublishRequest", "GetDownloadLinkRequ
            "SaveToDiskRequest", "GetPublicMetaRequest", "GetPublicDownloadLinkRequest",
            "MoveRequest", "FilesRequest", "PatchRequest"]
 
-def _substitute_keys(keys, sub_map):
+Fields = Iterable[str]
+
+def _substitute_keys(keys: Iterable[str], sub_map: Dict[str, str]) -> List[str]:
     return [".".join(sub_map.get(f, f) for f in k.split(".")) for k in keys]
 
 class GetPublicResourcesRequest(APIRequest):
     """
         A request to get a list of public resources.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: maximum number of elements in the list
         :param preview_size: size of the file preview
@@ -38,8 +47,14 @@ class GetPublicResourcesRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/resources/public"
     method = "GET"
 
-    def __init__(self, session, offset=0, limit=20, preview_size=None,
-                 preview_crop=None, type=None, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 offset: int = 0,
+                 limit: int = 20,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 type: Optional[str] = None,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"offset":       offset,
                                             "limit":        limit,
                                             "preview_size": preview_size,
@@ -47,7 +62,13 @@ class GetPublicResourcesRequest(APIRequest):
                                             "type":         type,
                                             "fields":       fields}, **kwargs)
 
-    def process_args(self, offset, limit, preview_size, preview_crop, type, fields):
+    def process_args(self,
+                     offset: int,
+                     limit: int,
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     type: Optional[str],
+                     fields: Optional[Iterable[str]]) -> None:
         self.params["offset"] = offset
         self.params["limit"] = limit
 
@@ -63,62 +84,83 @@ class GetPublicResourcesRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return PublicResourcesListObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> PublicResourcesListObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return PublicResourcesListObject(js, yadisk)
 
 class UnpublishRequest(APIRequest):
     """
         A request to make a public resource private.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource to be unpublished
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject`
+        :returns: :any:`ResourceLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources/unpublish"
     method = "PUT"
 
-    def __init__(self, session, path, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":   path,
                                             "fields": fields}, **kwargs)
 
-    def process_args(self, path, fields):
+    def process_args(self, path: str, fields: Optional[Iterable[str]]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
 
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceLinkObject(js, yadisk)
 
 class GetDownloadLinkRequest(APIRequest):
     """
         A request to get a download link to a resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource to be downloaded
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject`
+        :returns: :any:`ResourceDownloadLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources/download"
     method = "GET"
 
-    def __init__(self, session, path, fields=None, **kwargs):
-        APIRequest.__init__(self, session, {"path": path, "fields": fields},
-                            **kwargs)
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
+        APIRequest.__init__(
+            self, session, {"path": path, "fields": fields}, **kwargs)
 
-    def process_args(self, path, fields):
+    def process_args(self, path: str, fields: Optional[Iterable[str]]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
 
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceDownloadLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceDownloadLinkObject(js, yadisk)
 
 class GetTrashRequest(APIRequest):
     """
@@ -138,8 +180,15 @@ class GetTrashRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/trash/resources"
     method = "GET"
 
-    def __init__(self, session, path=None, offset=0, limit=20, sort=None,
-                 preview_size=None, preview_crop=None, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 offset: int = 0,
+                 limit: int = 20,
+                 sort: Optional[str] = None,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":         path,
                                             "offset":       offset,
                                             "limit":        limit,
@@ -148,7 +197,14 @@ class GetTrashRequest(APIRequest):
                                             "preview_crop": preview_crop,
                                             "fields":       fields}, **kwargs)
 
-    def process_args(self, path, offset, limit, sort, preview_size, preview_crop, fields):
+    def process_args(self,
+                     path: str,
+                     offset: int,
+                     limit: int,
+                     sort: Optional[str],
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     fields: Optional[Iterable[str]]) -> None:
         self.params["path"] = ensure_path_has_schema(path, "trash")
         self.params["offset"] = offset
         self.params["limit"] = limit
@@ -167,36 +223,51 @@ class GetTrashRequest(APIRequest):
 
             self.params["fields"] = ",".join(_substitute_keys(fields, sub_map))
 
-    def process_json(self, js):
-        return TrashResourceObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> TrashResourceObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return TrashResourceObject(js, yadisk)
 
 class RestoreTrashRequest(APIRequest):
     """
         A request to restore trash.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the trash resource to be restored
         :param dst_path: destination path
         :param force_async: forces the operation to be executed asynchronously
         :param overwrite: `bool`, determines whether the destination can be overwritten
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+        :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/trash/resources/restore"
     method = "PUT"
     success_codes = {201, 202}
 
-    def __init__(self, session, path, dst_path=None, force_async=False,
-                 overwrite=False, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 dst_path: Optional[str] = None,
+                 force_async: bool = False,
+                 overwrite: bool = False,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":        path,
                                             "dst_path":    dst_path,
                                             "overwrite":   overwrite,
                                             "force_async": force_async,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, path, dst_path, force_async, overwrite, fields):
+    def process_args(self,
+                     path: str,
+                     dst_path: Optional[str],
+                     force_async: bool,
+                     overwrite: bool,
+                     fields: Optional[Iterable[str]]) -> None:
         self.params["path"] = ensure_path_has_schema(path, "trash")
         self.params["overwrite"] = "true" if overwrite else "false"
         self.params["force_async"] = "true" if force_async else "false"
@@ -207,17 +278,22 @@ class RestoreTrashRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        if is_operation_link(js.get("href", "")):
-            return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Union[OperationLinkObject, ResourceLinkObject]:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
 
-        return LinkObject(js)
+        if is_operation_link(js.get("href", "")):
+            return OperationLinkObject(js, yadisk)
+
+        return ResourceLinkObject(js, yadisk)
 
 class DeleteTrashRequest(APIRequest):
     """
         A request to delete a trash resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the trash resource to be deleted
         :param force_async: forces the operation to be executed asynchronously
         :param fields: list of keys to be included in the response
@@ -229,13 +305,19 @@ class DeleteTrashRequest(APIRequest):
     method = "DELETE"
     success_codes = {202, 204}
 
-    def __init__(self, session, path=None, force_async=False, fields=None,
-                 **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: Optional[str] = None,
+                 force_async: bool = False,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":        path,
                                             "force_async": force_async,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, path, force_async, fields):
+    def process_args(self,
+                     path: Optional[str],
+                     force_async: bool,
+                     fields: Optional[Iterable[str]]) -> None:
         if path is not None:
             self.params["path"] = ensure_path_has_schema(path, "trash")
 
@@ -244,14 +326,17 @@ class DeleteTrashRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Optional[OperationLinkObject]:
+        if js is not None:
+            return OperationLinkObject(js, yadisk)
 
 class LastUploadedRequest(APIRequest):
     """
         A request to get the list of latest uploaded files sorted by upload date.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param limit: maximum number of elements in the list
         :param media_type: type of files to include in the list
         :param preview_size: size of the file preview
@@ -264,19 +349,29 @@ class LastUploadedRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/resources/last-uploaded"
     method = "GET"
 
-    def __init__(self, session, limit=20, media_type=None, preview_size=None,
-                 preview_crop=None, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 limit: int = 20,
+                 media_type: Optional[Union[str, Iterable[str]]] = None,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 fields: Optional[Iterable[str]] = None, **kwargs):
         APIRequest.__init__(self, session, {"limit":        limit,
                                             "media_type":   media_type,
                                             "preview_size": preview_size,
                                             "preview_crop": preview_crop,
                                             "fields":       fields}, **kwargs)
 
-    def process_args(self, limit, media_type, preview_size, preview_crop, fields):
+    def process_args(self,
+                     limit: int,
+                     media_type: Optional[str],
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     fields: Optional[Iterable[str]]) -> None:
         self.params["limit"] = limit
 
         if media_type is not None:
-            if not isinstance(media_type, collections.Iterable):
+            if not isinstance(media_type, Iterable):
                 raise TypeError("media_type should be a string or an iterable")
 
             if isinstance(media_type, str):
@@ -293,14 +388,18 @@ class LastUploadedRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LastUploadedResourceListObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> LastUploadedResourceListObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+        return LastUploadedResourceListObject(js, yadisk)
 
 class CopyRequest(APIRequest):
     """
         A request to copy a file or a directory.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param src_path: source path
         :param dst_path: destination path
         :param overwrite: if `True` the destination path can be overwritten,
@@ -308,22 +407,32 @@ class CopyRequest(APIRequest):
         :param force_async: forces the operation to be executed asynchronously
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+        :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources/copy"
     method = "POST"
     success_codes = {201, 202}
 
-    def __init__(self, session, src_path, dst_path, overwrite=False,
-                 force_async=False, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 src_path: str,
+                 dst_path: str,
+                 overwrite: bool = False,
+                 force_async: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"src_path":    src_path,
                                             "dst_path":    dst_path,
                                             "overwrite":   overwrite,
                                             "force_async": force_async,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, src_path, dst_path, overwrite, force_async, fields):
+    def process_args(self,
+                     src_path: str,
+                     dst_path: str,
+                     overwrite: bool,
+                     force_async: bool,
+                     fields: Optional[Fields]) -> None:
         self.params["from"] = ensure_path_has_schema(src_path)
         self.params["path"] = ensure_path_has_schema(dst_path)
         self.params["overwrite"] = "true" if overwrite else "false"
@@ -332,17 +441,22 @@ class CopyRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        if is_operation_link(js["href"]):
-            return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Union[OperationLinkObject, ResourceLinkObject]:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
 
-        return LinkObject(js)
+        if is_operation_link(js.get("href", "")):
+            return OperationLinkObject(js, yadisk)
+
+        return ResourceLinkObject(js, yadisk)
 
 class GetMetaRequest(APIRequest):
     """
         A request to get meta-information about a resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource
         :param limit: number of children resources to be included in the response
         :param offset: number of children resources to be skipped in the response
@@ -357,9 +471,15 @@ class GetMetaRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/resources"
     method = "GET"
 
-    def __init__(self, session, path, limit=None, offset=None,
-                 preview_size=None, preview_crop=None, sort=None,
-                 fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 limit: Optional[int] = None,
+                 offset: Optional[int] = None,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 sort: Optional[str] = None,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session,
                             {"path":         path,
                              "limit":        limit,
@@ -369,8 +489,14 @@ class GetMetaRequest(APIRequest):
                              "sort":         sort,
                              "fields":       fields}, **kwargs)
 
-    def process_args(self, path, limit, offset, preview_size,
-                     preview_crop, sort, fields):
+    def process_args(self,
+                     path: str,
+                     limit: Optional[int],
+                     offset: Optional[int],
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     sort: Optional[str],
+                     fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
 
         if limit is not None:
@@ -393,14 +519,19 @@ class GetMetaRequest(APIRequest):
 
             self.params["fields"] = ",".join(_substitute_keys(fields, sub_map))
 
-    def process_json(self, js):
-        return ResourceObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceObject(js, yadisk)
 
 class GetUploadLinkRequest(APIRequest):
     """
         A request to get an upload link.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to be uploaded at
         :param overwrite: `bool`, determines whether to overwrite the destination
         :param fields: list of keys to be included in the response
@@ -411,20 +542,29 @@ class GetUploadLinkRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
     method = "GET"
 
-    def __init__(self, session, path, overwrite=False, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 overwrite: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":      path,
                                             "overwrite": overwrite,
                                             "fields":    fields}, **kwargs)
 
-    def process_args(self, path, overwrite, fields):
+    def process_args(self, path: str, overwrite: bool, fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
         self.params["overwrite"] = "true" if overwrite else "false"
 
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return ResourceUploadLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceUploadLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceUploadLinkObject(js, yadisk)
 
 class MkdirRequest(APIRequest):
     """
@@ -433,58 +573,74 @@ class MkdirRequest(APIRequest):
         :param path: path to the directory to be created
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject`
+        :returns: :any:`ResourceLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources"
     method = "PUT"
     success_codes = {201}
 
-    def __init__(self, session, path, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"path": path, "fields": fields},
                             **kwargs)
 
-    def process_args(self, path, fields):
+    def process_args(self, path: str, fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
 
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceLinkObject(js, yadisk)
 
 class PublishRequest(APIRequest):
     """
         A request to make a resource public.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource to be published
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject`
+        :returns: :any:`ResourceLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources/publish"
     method = "PUT"
 
-    def __init__(self, session, path, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":   path,
                                             "fields": fields}, **kwargs)
 
-    def process_args(self, path, fields):
+    def process_args(self, path: str, fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
 
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceLinkObject(js, yadisk)
 
 class UploadURLRequest(APIRequest):
     """
         A request to upload a file from URL.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param url: source URL
         :param path: destination path
         :param disable_redirects: `bool`, forbid redirects
@@ -497,14 +653,22 @@ class UploadURLRequest(APIRequest):
     method = "POST"
     success_codes = {202}
 
-    def __init__(self, session, url, path, disable_redirects=False, fields=None,
-                 **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 url: str,
+                 path: str,
+                 disable_redirects: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"url":               url,
                                             "path":              path,
                                             "disable_redirects": disable_redirects,
                                             "fields":            fields}, **kwargs)
 
-    def process_args(self, url, path, disable_redirects, fields):
+    def process_args(self,
+                     url: str,
+                     path: str,
+                     disable_redirects: bool,
+                     fields: Optional[Fields]) -> None:
         self.params["url"] = url
         self.params["path"] = ensure_path_has_schema(path)
         self.params["disable_redirects"] = "true" if disable_redirects else "false"
@@ -512,14 +676,19 @@ class UploadURLRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> OperationLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return OperationLinkObject(js, yadisk)
 
 class DeleteRequest(APIRequest):
     """
         A request to delete a file or a directory.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource to be removed
         :param permanently: if `True`, the resource will be removed permanently,
                             otherwise, it will be just moved to the trash
@@ -534,15 +703,25 @@ class DeleteRequest(APIRequest):
     method = "DELETE"
     success_codes = {202, 204}
 
-    def __init__(self, session, path, permanently=False, md5=None, force_async=False,
-                 fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 permanently: bool = False,
+                 md5: Optional[str] = None,
+                 force_async: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":        path,
                                             "permanently": permanently,
                                             "md5":         md5,
                                             "force_async": force_async,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, path, permanently, md5, force_async, fields):
+    def process_args(self,
+                     path: str,
+                     permanently: bool,
+                     md5: Optional[str],
+                     force_async: bool,
+                     fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
         self.params["permanently"] = "true" if permanently else "false"
         self.params["force_async"] = "true" if force_async else "false"
@@ -553,14 +732,17 @@ class DeleteRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Optional[OperationLinkObject]:
+        if js is not None:
+            return OperationLinkObject(js, yadisk)
 
 class SaveToDiskRequest(APIRequest):
     """
         A request to save a public resource to the disk.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param public_key: public key or public URL of the resource
         :param name: filename of the saved resource
         :param path: path to the copied resource in the public folder
@@ -568,15 +750,21 @@ class SaveToDiskRequest(APIRequest):
         :param force_async: forces the operation to be executed asynchronously
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+        :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/public/resources/save-to-disk"
     method = "POST"
     success_codes = {201, 202}
 
-    def __init__(self, session, public_key, name=None, path=None, save_path=None,
-                 force_async=False, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 public_key: str,
+                 name: Optional[str] = None,
+                 path: Optional[str] = None,
+                 save_path: Optional[str] = None,
+                 force_async: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"public_key":  public_key,
                                             "name":        name,
                                             "path":        path,
@@ -584,7 +772,13 @@ class SaveToDiskRequest(APIRequest):
                                             "force_async": force_async,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, public_key, name, path, save_path, force_async, fields):
+    def process_args(self,
+                     public_key: str,
+                     name: Optional[str],
+                     path: Optional[str],
+                     save_path: Optional[str],
+                     force_async: bool,
+                     fields: Optional[Fields]) -> None:
         self.params["public_key"] = public_key
 
         if name is not None:
@@ -601,17 +795,22 @@ class SaveToDiskRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        if is_operation_link(js.get("href", "")):
-            return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Union[OperationLinkObject, ResourceLinkObject]:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
 
-        return LinkObject(js)
+        if is_operation_link(js.get("href", "")):
+            return OperationLinkObject(js, yadisk)
+
+        return ResourceLinkObject(js, yadisk)
 
 class GetPublicMetaRequest(APIRequest):
     """
         A request to get meta-information about a public resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param public_key: public key or public URL of the resource
         :param path: relative path to a resource in a public folder.
                      By specifying the key of the published folder in `public_key`,
@@ -629,9 +828,16 @@ class GetPublicMetaRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/public/resources"
     method = "GET"
 
-    def __init__(self, session, public_key, offset=0, limit=20, path=None,
-                 sort=None, preview_size=None, preview_crop=None, fields=None,
-                 **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 public_key: str,
+                 offset: int = 0,
+                 limit: int = 20,
+                 path: Optional[str] = None,
+                 sort: Optional[str] = None,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"public_key":   public_key,
                                             "offset":       offset,
                                             "limit":        limit,
@@ -641,8 +847,15 @@ class GetPublicMetaRequest(APIRequest):
                                             "preview_crop": preview_crop,
                                             "fields":       fields}, **kwargs)
 
-    def process_args(self, public_key, offset, limit, path,
-                     sort, preview_size, preview_crop, fields):
+    def process_args(self,
+                     public_key: str,
+                     offset: int,
+                     limit: int,
+                     path: Optional[str],
+                     sort: Optional[str],
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     fields: Optional[Fields]) -> None:
         self.params["public_key"] = public_key
         self.params["offset"] = offset
         self.params["limit"] = limit
@@ -665,30 +878,42 @@ class GetPublicMetaRequest(APIRequest):
 
             self.params["fields"] = ",".join(_substitute_keys(fields, sub_map))
 
-    def process_json(self, js):
-        return PublicResourceObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> PublicResourceObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return PublicResourceObject(js, yadisk)
 
 class GetPublicDownloadLinkRequest(APIRequest):
     """
         A request to get a download link for a public resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param public_key: public key or public URL of the resource
         :param path: relative path to the resource within the public folder
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`LinkObject`
+        :returns: :any:`ResourceDownloadLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/public/resources/download"
     method = "GET"
 
-    def __init__(self, session, public_key, path=None, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 public_key: str,
+                 path: Optional[str] = None,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"public_key": public_key,
                                             "path":       path,
                                             "fields":     fields}, **kwargs)
 
-    def process_args(self, public_key, path, fields):
+    def process_args(self,
+                     public_key: str,
+                     path: Optional[str],
+                     fields: Optional[Fields]) -> None:
         self.params["public_key"] = public_key
 
         if path is not None:
@@ -697,36 +922,51 @@ class GetPublicDownloadLinkRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return LinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceDownloadLinkObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return ResourceDownloadLinkObject(js, yadisk)
 
 class MoveRequest(APIRequest):
     """
         A request to move a resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param src_path: source path to be moved
         :param dst_path: destination path
         :param force_async: forces the operation to be executed asynchronously
         :param overwrite: `bool`, determines whether to overwrite the destination
         :param fields: list of keys to be included in the response
 
-        :returns: :any:`OperationLinkObject` or :any:`LinkObject`
+        :returns: :any:`OperationLinkObject` or :any:`ResourceLinkObject`
     """
 
     url = "https://cloud-api.yandex.net/v1/disk/resources/move"
     method = "POST"
     success_codes = {201, 202}
 
-    def __init__(self, session, src_path, dst_path, force_async=False,
-                 overwrite=False, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 src_path: str,
+                 dst_path: str,
+                 force_async: bool = False,
+                 overwrite: bool = False,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"src_path":    src_path,
                                             "dst_path":    dst_path,
                                             "force_async": force_async,
                                             "overwrite":   overwrite,
                                             "fields":      fields}, **kwargs)
 
-    def process_args(self, src_path, dst_path, force_async, overwrite, fields):
+    def process_args(self,
+                     src_path: str,
+                     dst_path: str,
+                     force_async: bool,
+                     overwrite: bool,
+                     fields: Optional[Fields]) -> None:
         self.params["from"] = ensure_path_has_schema(src_path)
         self.params["path"] = ensure_path_has_schema(dst_path)
         self.params["overwrite"] = "true" if overwrite else "false"
@@ -735,17 +975,22 @@ class MoveRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        if is_operation_link(js.get("href", "")):
-            return OperationLinkObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> Union[OperationLinkObject, ResourceLinkObject]:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
 
-        return LinkObject(js)
+        if is_operation_link(js.get("href", "")):
+            return OperationLinkObject(js, yadisk)
+
+        return ResourceLinkObject(js, yadisk)
 
 class FilesRequest(APIRequest):
     """
         A request to get a flat list of all files (that doesn't include directories).
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param offset: offset from the beginning of the list
         :param limit: number of list elements to be included
         :param media_type: type of files to include in the list
@@ -760,9 +1005,15 @@ class FilesRequest(APIRequest):
     url = "https://cloud-api.yandex.net/v1/disk/resources/files"
     method = "GET"
 
-    def __init__(self, session, offset=0, limit=20, media_type=None,
-                 preview_size=None, preview_crop=None, sort=None, fields=None,
-                 **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 offset: int = 0,
+                 limit: int = 20,
+                 media_type: Optional[Union[str, Iterable[str]]] = None,
+                 preview_size: Optional[str] = None,
+                 preview_crop: Optional[bool] = None,
+                 sort: Optional[str] = None,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"offset":       offset,
                                             "limit":        limit,
                                             "media_type":   media_type,
@@ -771,12 +1022,19 @@ class FilesRequest(APIRequest):
                                             "preview_crop": preview_crop,
                                             "fields":       fields}, **kwargs)
 
-    def process_args(self, offset, limit, media_type, sort, preview_size, preview_crop, fields):
+    def process_args(self,
+                     offset: int,
+                     limit: int,
+                     media_type: Optional[Union[str, Iterable[str]]],
+                     sort: Optional[str],
+                     preview_size: Optional[str],
+                     preview_crop: Optional[bool],
+                     fields: Optional[Fields]) -> None:
         self.params["offset"] = offset
         self.params["limit"] = limit
 
         if media_type is not None:
-            if not isinstance(media_type, collections.Iterable):
+            if not isinstance(media_type, Iterable):
                 raise TypeError("media_type should be a string or an iterable")
 
             if isinstance(media_type, str):
@@ -796,14 +1054,19 @@ class FilesRequest(APIRequest):
         if fields is not None:
             self.params["fields"] = ",".join(fields)
 
-    def process_json(self, js):
-        return FilesResourceListObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> FilesResourceListObject:
+        if js is None:
+            raise InvalidResponseError("Yandex.Disk returned invalid JSON")
+
+        return FilesResourceListObject(js, yadisk)
 
 class PatchRequest(APIRequest):
     """
         A request to update custom properties of a resource.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders` with prepared headers
+        :param session: an instance of `aiohttp.ClientSession` with prepared headers
         :param path: path to the resource
         :param properties: `dict`, custom properties to update
         :param fields: list of keys to be included in the response
@@ -815,11 +1078,15 @@ class PatchRequest(APIRequest):
     method = "PATCH"
     content_type = "application/json"
 
-    def __init__(self, session, path, properties, fields=None, **kwargs):
+    def __init__(self,
+                 session: "aiohttp.ClientSession",
+                 path: str,
+                 properties: dict,
+                 fields: Optional[Fields] = None, **kwargs):
         APIRequest.__init__(self, session, {"path":       path,
                                             "properties": properties,
                                             "fields":     fields}, **kwargs)
-    def process_args(self, path, properties, fields):
+    def process_args(self, path: str, properties: dict, fields: Optional[Fields]) -> None:
         self.params["path"] = ensure_path_has_schema(path)
         self.data = json.dumps({"custom_properties": properties}).encode("utf8")
 
@@ -828,5 +1095,7 @@ class PatchRequest(APIRequest):
 
             self.params["fields"] = ",".join(_substitute_keys(fields, sub_map))
 
-    def process_json(self, js):
-        return ResourceObject(js)
+    def process_json(self,
+                     js: Optional[dict],
+                     yadisk: Optional["YaDisk"] = None) -> ResourceObject:
+        return ResourceObject(js, yadisk)

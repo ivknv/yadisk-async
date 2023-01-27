@@ -1,15 +1,22 @@
 # -*- coding: utf-8 -*-
 
+import aiohttp
+
+from ..exceptions import InvalidResponseError
+
 from ..utils import auto_retry, get_exception
 from ..common import CaseInsensitiveDict
 from .. import settings
+
+from typing import Optional, Union, TypeVar
+from ..compat import Set
 
 __all__ = ["APIRequest"]
 
 # For cases when None can't be used
 _DEFAULT_TIMEOUT = object()
 
-class APIRequest(object):
+class APIRequest:
     """
         Base class for all API requests.
 
@@ -30,15 +37,20 @@ class APIRequest(object):
         :ivar retry_interval: `float`, delay between retries in seconds
     """
 
-    url = None
-    method = None
-    content_type = "application/x-www-form-urlencoded"
+    url: Optional[str] = None
+    method: Optional[str] = None
+    content_type: str = "application/x-www-form-urlencoded"
     timeout = _DEFAULT_TIMEOUT
-    n_retries = None
-    success_codes = {200}
-    retry_interval = None
+    n_retries: Optional[int] = None
+    success_codes: Set[int] = {200}
+    retry_interval: Optional[Union[int, float]] = None
 
-    def __init__(self, session, args, **kwargs):
+    response: Optional[aiohttp.ClientResponse]
+    session: aiohttp.ClientSession
+
+    T = TypeVar("T")
+
+    def __init__(self, session: aiohttp.ClientSession, args: dict, **kwargs):
         kwargs = dict(kwargs)
 
         n_retries = kwargs.pop("n_retries", None)
@@ -81,10 +93,10 @@ class APIRequest(object):
 
         self.process_args(**self.args)
 
-    def process_args(self):
+    def process_args(self) -> None:
         raise NotImplementedError
 
-    async def _attempt(self):
+    async def _attempt(self) -> None:
         headers = CaseInsensitiveDict(self.session.headers)
         headers["Content-Type"] = self.content_type
         headers.update(self.headers)
@@ -94,6 +106,9 @@ class APIRequest(object):
                        "data":    self.data,
                        "params":  self.params})
 
+        assert self.method is not None
+        assert self.url is not None
+
         self.response = await self.session.request(self.method, self.url, **kwargs)
 
         success = self.response.status in self.success_codes
@@ -101,39 +116,46 @@ class APIRequest(object):
         if not success:
             raise await get_exception(self.response)
 
-    async def send(self):
+    async def send(self) -> aiohttp.ClientResponse:
         """
             Actually send the request
-           
-           :returns: :any:`aiohttp.ClientResponse` (`self.response`)
+
+            :returns: :any:`aiohttp.ClientResponse` (`self.response`)
         """
 
         await auto_retry(self._attempt, self.n_retries, self.retry_interval)
 
+        assert self.response is not None
+
         return self.response
 
-    def process_json(self, js):
+    def process_json(self, js: Optional[dict], **kwargs) -> T:
         """
             Process the JSON response.
 
             :param js: `dict`, JSON response
+            :param kwargs: extra arguments (optional)
 
             :returns: processed response, can be anything
         """
 
         raise NotImplementedError
 
-    async def process(self):
+    async def process(self, **kwargs) -> T:
         """
             Process the response.
 
             :returns: depends on `self.process_json()`
         """
 
+        assert self.response is not None
+
         try:
             result = await self.response.json()
         except (ValueError, RuntimeError):
             result = None
 
-        if result is not None:
+        try:
             return self.process_json(result)
+        except ValueError as e:
+            raise InvalidResponseError(f"Server returned invalid response: {e}")

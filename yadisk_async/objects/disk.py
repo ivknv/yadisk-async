@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from functools import partial
 from .yadisk_object import YaDiskObject
+from ..common import str_or_error, bool_or_error, int_or_error
+
+from typing import Optional, NoReturn, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..yadisk import YaDisk
 
 __all__ = ["DiskInfoObject", "SystemFoldersObject", "UserObject", "UserPublicInfoObject"]
 
@@ -9,6 +16,7 @@ class DiskInfoObject(YaDiskObject):
         Disk information object.
 
         :param disk_info: `dict` or `None`
+        :param yadisk: :any:`YaDisk` or `None`, `YaDisk` object
 
         :ivar max_file_size: `int`, maximum supported file size (bytes)
         :ivar unlimited_autoupload_enabled: `bool`, tells whether unlimited
@@ -22,16 +30,29 @@ class DiskInfoObject(YaDiskObject):
         :ivar revision: `int`, current revision of Yandex.Disk
     """
 
-    def __init__(self, disk_info=None):
-        YaDiskObject.__init__(self, {"max_file_size":  int,
-                                     "unlimited_autoupload_enabled": bool,
-                                     "total_space":    int,
-                                     "trash_size":     int,
-                                     "is_paid":        bool,
-                                     "used_space":     int,
-                                     "system_folders": SystemFoldersObject,
-                                     "user":           UserObject,
-                                     "revision":       int})
+    max_file_size: Optional[int]
+    unlimited_autoupload_enabled: Optional[bool]
+    total_space: Optional[int]
+    trash_size: Optional[int]
+    is_paid: Optional[bool]
+    used_space: Optional[int]
+    system_folders: "SystemFoldersObject"
+    user: "UserObject"
+    revision: Optional[int]
+
+    def __init__(self, disk_info: Optional[dict] = None, yadisk: Optional["YaDisk"] = None):
+        YaDiskObject.__init__(
+            self,
+            {"max_file_size":                int_or_error,
+             "unlimited_autoupload_enabled": bool_or_error,
+             "total_space":                  int_or_error,
+             "trash_size":                   int_or_error,
+             "is_paid":                      bool_or_error,
+             "used_space":                   int_or_error,
+             "system_folders":               partial(SystemFoldersObject, yadisk=yadisk),
+             "user":                         partial(UserObject, yadisk=yadisk),
+             "revision":                     int_or_error},
+            yadisk)
 
         self.import_fields(disk_info)
 
@@ -40,6 +61,7 @@ class SystemFoldersObject(YaDiskObject):
         Object, containing paths to system folders.
 
         :param system_folders: `dict` or `None`
+        :param yadisk: :any:`YaDisk` or `None`, `YaDisk` object
 
         :ivar odnoklassniki: `str`, path to the Odnoklassniki folder
         :ivar google: `str`, path to the Google+ folder
@@ -52,18 +74,35 @@ class SystemFoldersObject(YaDiskObject):
         :ivar photostream: `str`, path to the camera folder
     """
 
-    def __init__(self, system_folders=None):
-        YaDiskObject.__init__(self, {"odnoklassniki": str,
-                                     "google":        str,
-                                     "instagram":     str,
-                                     "vkontakte":     str,
-                                     "mailru":        str,
-                                     "downloads":     str,
-                                     "applications":  str,
-                                     "facebook":      str,
-                                     "social":        str,
-                                     "screenshots":   str,
-                                     "photostream":   str})
+    odnoklassniki: Optional[str]
+    google:        Optional[str]
+    instagram:     Optional[str]
+    vkontakte:     Optional[str]
+    mailru:        Optional[str]
+    downloads:     Optional[str]
+    applications:  Optional[str]
+    facebook:      Optional[str]
+    social:        Optional[str]
+    screenshots:   Optional[str]
+    photostream:   Optional[str]
+
+    def __init__(self,
+                 system_folders: Optional[dict] = None,
+                 yadisk: Optional["YaDisk"] = None):
+        YaDiskObject.__init__(
+            self,
+            {"odnoklassniki": str_or_error,
+             "google":        str_or_error,
+             "instagram":     str_or_error,
+             "vkontakte":     str_or_error,
+             "mailru":        str_or_error,
+             "downloads":     str_or_error,
+             "applications":  str_or_error,
+             "facebook":      str_or_error,
+             "social":        str_or_error,
+             "screenshots":   str_or_error,
+             "photostream":   str_or_error},
+            yadisk)
 
         self.import_fields(system_folders)
 
@@ -72,6 +111,7 @@ class UserObject(YaDiskObject):
         User object.
 
         :param user: `dict` or `None`
+        :param yadisk: :any:`YaDisk` or `None`, `YaDisk` object
 
         :ivar country: `str`, user's country
         :ivar login: `str`, user's login
@@ -79,11 +119,19 @@ class UserObject(YaDiskObject):
         :ivar uid: `str`, user's UID
     """
 
-    def __init__(self, user=None):
-        YaDiskObject.__init__(self, {"country":      str,
-                                     "login":        str,
-                                     "display_name": str,
-                                     "uid":          str})
+    country: Optional[str]
+    login: Optional[str]
+    display_name: Optional[str]
+    uid: Optional[str]
+
+    def __init__(self, user: Optional[dict] = None, yadisk: Optional["YaDisk"] = None):
+        YaDiskObject.__init__(
+            self,
+            {"country":      str_or_error,
+             "login":        str_or_error,
+             "display_name": str_or_error,
+             "uid":          str_or_error},
+            yadisk)
 
         self.import_fields(user)
 
@@ -93,13 +141,18 @@ class UserPublicInfoObject(UserObject):
         Inherits from :any:`UserObject` for compatibility.
 
         :param public_user_info: `dict` or `None`
+        :param yadisk: :any:`YaDisk` or `None`, `YaDisk` object
 
         :ivar login: `str`, user's login
         :ivar display_name: `str`, user's display name
         :ivar uid: `str`, user's UID
     """
 
-    def __init__(self, public_user_info=None):
-        UserObject.__init__(self, public_user_info)
+    country: NoReturn
+
+    def __init__(self,
+                 public_user_info: Optional[dict] = None,
+                 yadisk: Optional["YaDisk"] = None):
+        UserObject.__init__(self, None, yadisk)
         self.remove_field("country")
         self.import_fields(public_user_info)

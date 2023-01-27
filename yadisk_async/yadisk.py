@@ -1,17 +1,141 @@
 # -*- coding: utf-8 -*-
 
-import functools
 import threading
-import sys
+from pathlib import PurePosixPath
 
-import aiohttp
+from urllib.parse import urlencode
+import io
 
-from . import functions
+from . import settings
 from .session import SessionWithHeaders
+from .api import *
+from .exceptions import UnauthorizedError, OperationNotFoundError
+from .exceptions import PathNotFoundError, WrongResourceTypeError
+from .utils import get_exception, auto_retry
+from .objects import ResourceLinkObject, PublicResourceLinkObject
+
+from typing import Optional, Union, IO, TYPE_CHECKING
+from .compat import Callable, AsyncGenerator, List
+
+if TYPE_CHECKING:
+    from .objects import TokenObject, TokenRevokeStatusObject, DiskInfoObject
+    from .objects import ResourceObject, OperationLinkObject
+    from .objects import TrashResourceObject, PublicResourceObject
+    from .objects import PublicResourcesListObject
 
 __all__ = ["YaDisk"]
 
-class YaDisk(object):
+async def _exists(get_meta_function: Callable, /, *args, **kwargs) -> bool:
+    kwargs["limit"] = 0
+
+    try:
+        await get_meta_function(*args, **kwargs)
+
+        return True
+    except PathNotFoundError:
+        return False
+
+async def _get_type(get_meta_function: Callable, /, *args, **kwargs) -> str:
+    kwargs["limit"] = 0
+
+    return (await get_meta_function(*args, **kwargs)).type
+
+async def _listdir(get_meta_function: Callable, path: str, /, **kwargs) -> AsyncGenerator:
+    kwargs.setdefault("limit", 10000)
+
+    if kwargs.get("fields") is None:
+        kwargs["fields"] = []
+
+    kwargs["fields"] = ["embedded.items.%s" % (k,) for k in kwargs["fields"]]
+
+    # Fields that are absolutely necessary
+    NECESSARY_FIELDS = ["type",
+                        "embedded",
+                        "embedded.offset",
+                        "embedded.limit",
+                        "embedded.total",
+                        "embedded.items"]
+
+    kwargs["fields"].extend(NECESSARY_FIELDS)
+
+    result = await get_meta_function(path, **kwargs)
+
+    if result.type == "file":
+        raise WrongResourceTypeError("%r is a file" % (path,))
+
+    for child in result.embedded.items:
+        yield child
+
+    limit = result.embedded.limit
+    offset = result.embedded.offset
+    total = result.embedded.total
+
+    while offset + limit < total:
+        offset += limit
+        kwargs["offset"] = offset
+        result = await get_meta_function(path, **kwargs)
+
+        for child in result.embedded.items:
+            yield child
+
+        limit = result.embedded.limit
+        total = result.embedded.total
+
+class UnclosableFile(io.IOBase):
+    """
+        File-like object that cannot be closed.
+        It exists only to prevent aiohttp from closing the file after uploading
+        it with the PUT request.
+    """
+
+    def __init__(self, file: IO):
+        io.IOBase.__init__(self)
+        self.file = file
+
+    def close(self) -> None:
+        pass
+
+    @property
+    def closed(self) -> bool:
+        return self.file.closed
+
+    def flush(self) -> None:
+        self.file.flush()
+
+    def seek(self, *args, **kwargs) -> int:
+        return self.file.seek(*args, **kwargs)
+
+    def seekable(self) -> bool:
+        return self.file.seekable()
+
+    def tell(self) -> int:
+        return self.file.tell()
+
+    def truncate(self, *args, **kwargs) -> int:
+        return self.file.truncate(*args, **kwargs)
+
+    def writable(self) -> bool:
+        return self.file.writable()
+
+    def readable(self) -> bool:
+        return self.file.readable()
+
+    def read(self, *args, **kwargs) -> Union[str, bytes]:
+        return self.file.read(*args, **kwargs)
+
+    def readline(self, *args, **kwargs) -> Union[str, bytes]:
+        return self.file.readline(*args, **kwargs)
+
+    def readlines(self, *args, **kwargs) -> List[Union[str, bytes]]:
+        return self.file.readlines(*args, **kwargs)
+
+    def write(self, *args, **kwargs) -> int:
+        return self.file.write(*args, **kwargs)
+
+    def writelines(self, *args, **kwargs) -> None:
+        return self.file.writelines(*args, **kwargs)
+
+class YaDisk:
     """
         Implements access to Yandex.Disk REST API.
 
@@ -32,7 +156,11 @@ class YaDisk(object):
         :ivar token: `str`, application token
     """
 
-    def __init__(self, id="", secret="", token=""):
+    id: str
+    secret: str
+    token: str
+
+    def __init__(self, id: str ="", secret: str = "", token: str = ""):
         self.id = id
         self.secret = secret
         self.token = token
@@ -51,10 +179,10 @@ class YaDisk(object):
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, *args, **kwargs):
+    async def __aexit__(self, *args, **kwargs) -> None:
         await self.close()
 
-    async def close(self):
+    async def close(self) -> None:
         """
             Closes all sessions and clears the session cache.
             Do not call this method while there are other active threads using this object.
@@ -68,7 +196,7 @@ class YaDisk(object):
 
         self.clear_session_cache()
 
-    def clear_session_cache(self):
+    def clear_session_cache(self) -> None:
         """
             Clears the session cache. Unused sessions will NOT be closed.
 
@@ -77,12 +205,12 @@ class YaDisk(object):
 
         self._sessions.clear()
 
-    def make_session(self, token=None):
+    def make_session(self, token: Optional[str] = None) -> SessionWithHeaders:
         """
-            Prepares `yadisk_async.session.SessionWithHeaders` object with headers needed for API.
+            Prepares :any:`yadisk_async.session.SessionWithHeaders` object with headers needed for API.
 
             This method is not a coroutine.
-            
+
             :param token: application token, equivalent to `self.token` if `None`
             :returns: `yadisk_async.session.SessionWithHeaders`
         """
@@ -97,13 +225,13 @@ class YaDisk(object):
 
         return session
 
-    def get_session(self, token=None):
+    def get_session(self, token: Optional[str] = None) -> SessionWithHeaders:
         """
             Like :any:`YaDisk.make_session` but cached.
 
             This method is not a coroutine.
-            
-            :returns: `yadisk_async.session.SessionWithHeaders`, different instances for different threads
+
+            :returns: :any:`yadisk_async.session.SessionWithHeaders`, different instances for different threads
         """
 
         if token is None:
@@ -111,7 +239,7 @@ class YaDisk(object):
 
         return self._get_session(token, threading.get_ident())
 
-    def get_auth_url(self, **kwargs):
+    def get_auth_url(self, **kwargs) -> str:
         """
             Get authentication URL for the user to go to.
 
@@ -131,9 +259,45 @@ class YaDisk(object):
             :returns: authentication URL
         """
 
-        return functions.get_auth_url(self.id, **kwargs)
+        type           = kwargs.get("type")
+        device_id      = kwargs.get("device_id")
+        device_name    = kwargs.get("device_name")
+        display        = kwargs.get("display", "popup")
+        login_hint     = kwargs.get("login_hint")
+        scope          = kwargs.get("scope")
+        optional_scope = kwargs.get("optional_scope")
+        force_confirm  = kwargs.get("force_confirm", True)
+        state          = kwargs.get("state")
 
-    def get_code_url(self, **kwargs):
+        if type not in {"code", "token"}:
+            raise ValueError("type must be either 'code' or 'token'")
+
+        params = {"response_type": type,
+                  "client_id":     self.id,
+                  "display":       display,
+                  "force_confirm": "yes" if force_confirm else "no"}
+
+        if device_id is not None:
+            params["device_id"] = device_id
+
+        if device_name is not None:
+            params["device_name"] = device_name
+
+        if login_hint is not None:
+            params["login_hint"] = login_hint
+
+        if scope is not None:
+            params["scope"] = " ".join(scope)
+
+        if optional_scope is not None:
+            params["optional_scope"] = " ".join(optional_scope)
+
+        if state is not None:
+            params["state"] = state
+
+        return "https://oauth.yandex.ru/authorize?" + urlencode(params)
+
+    def get_code_url(self, **kwargs) -> str:
         """
             Get the URL for the user to get the confirmation code.
             The confirmation code can later be used to get the token.
@@ -153,9 +317,11 @@ class YaDisk(object):
             :returns: authentication URL
         """
 
-        return functions.get_code_url(self.id, **kwargs)
+        kwargs["type"] = "code"
 
-    async def get_token(self, code, **kwargs):
+        return self.get_auth_url(**kwargs)
+
+    async def get_token(self, code: str, /, **kwargs) -> "TokenObject":
         """
             Get a new token.
 
@@ -166,12 +332,18 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises BadRequestError: invalid or expired code, application ID or secret
+
             :returns: :any:`TokenObject`
         """
 
-        return await functions.get_token(code, self.id, self.secret, **kwargs)
+        async with SessionWithHeaders() as session:
+            request = GetTokenRequest(session, code, self.id, self.secret, **kwargs)
+            await request.send()
 
-    async def refresh_token(self, refresh_token, **kwargs):
+            return await request.process()
+
+    async def refresh_token(self, refresh_token: str, /, **kwargs) -> "TokenObject":
         """
             Refresh an existing token.
 
@@ -181,13 +353,19 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises BadRequestError: invalid or expired refresh token, application ID or secret
+
             :returns: :any:`TokenObject`
         """
 
-        return await functions.refresh_token(refresh_token, self.id, self.secret,
-                                             **kwargs)
+        async with SessionWithHeaders() as session:
+            request = RefreshTokenRequest(
+                session, refresh_token, self.id, self.secret, **kwargs)
+            await request.send()
 
-    async def revoke_token(self, token=None, **kwargs):
+            return await request.process()
+
+    async def revoke_token(self, token: Optional[str] = None, /, **kwargs) -> "TokenRevokeStatusObject":
         """
             Revoke the token.
 
@@ -197,15 +375,22 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises BadRequestError: token cannot be revoked (not bound to this application, etc.)
+
             :returns: :any:`TokenRevokeStatusObject`
         """
 
         if token is None:
             token = self.token
 
-        return await functions.revoke_token(token, self.id, self.secret, **kwargs)
+        async with SessionWithHeaders() as session:
+            request = RevokeTokenRequest(
+                session, token, self.id, self.secret, **kwargs)
+            await request.send()
 
-    async def get_disk_info(self, **kwargs):
+            return await request.process()
+
+    async def get_disk_info(self, **kwargs) -> "DiskInfoObject":
         """
             Get disk information.
 
@@ -215,12 +400,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: :any:`DiskInfoObject`
         """
 
-        return await functions.get_disk_info(self.get_session(), **kwargs)
+        request = DiskInfoRequest(self.get_session(), **kwargs)
+        await request.send()
 
-    async def get_meta(self, path, **kwargs):
+        return await request.process()
+
+    async def get_meta(self, path: str, /, **kwargs) -> "ResourceObject":
         """
             Get meta information about a file/directory.
 
@@ -236,12 +426,18 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: :any:`ResourceObject`
         """
 
-        return await functions.get_meta(self.get_session(), path, **kwargs)
+        request = GetMetaRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def exists(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def exists(self, path: str, /, **kwargs) -> bool:
         """
             Check whether `path` exists.
 
@@ -251,12 +447,14 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `bool`
         """
 
-        return await functions.exists(self.get_session(), path, **kwargs)
+        return await _exists(self.get_meta, path, **kwargs)
 
-    async def get_type(self, path, **kwargs):
+    async def get_type(self, path: str, /, **kwargs) -> str:
         """
             Get resource type.
 
@@ -266,12 +464,15 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: "file" or "dir"
         """
 
-        return await functions.get_type(self.get_session(), path, **kwargs)
+        return await _get_type(self.get_meta, path, **kwargs)
 
-    async def is_file(self, path, **kwargs):
+    async def is_file(self, path: str, /, **kwargs) -> bool:
         """
             Check whether `path` is a file.
 
@@ -281,12 +482,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `path` is a file, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_file(self.get_session(), path, **kwargs)
+        try:
+            return (await self.get_type(path, **kwargs)) == "file"
+        except PathNotFoundError:
+            return False
 
-    async def is_dir(self, path, **kwargs):
+    async def is_dir(self, path: str, /, **kwargs) -> bool:
         """
             Check whether `path` is a directory.
 
@@ -296,12 +502,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_dir(self.get_session(), path, **kwargs)
+        try:
+            return (await self.get_type(path, **kwargs)) == "dir"
+        except PathNotFoundError:
+            return False
 
-    async def listdir(self, path, **kwargs):
+    async def listdir(self, path: str, /, **kwargs) -> AsyncGenerator["ResourceObject", None]:
         """
             Get contents of `path`.
 
@@ -316,12 +527,16 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises WrongResourceTypeError: resource is not a directory
+
             :returns: generator of :any:`ResourceObject`
         """
 
-        return await functions.listdir(self.get_session(), path, **kwargs)
+        return _listdir(self.get_meta, path, **kwargs)
 
-    async def get_upload_link(self, path, **kwargs):
+    async def get_upload_link(self, path: str, /, **kwargs) -> str:
         """
             Get a link to upload the file using the PUT request.
 
@@ -333,12 +548,90 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ParentNotFoundError: parent directory doesn't exist
+            :raises PathExistsError: destination path already exists
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises InsufficientStorageError: cannot upload file due to lack of storage space
+            :raises UploadTrafficLimitExceededError: upload limit has been exceeded
+
             :returns: `str`
         """
 
-        return await functions.get_upload_link(self.get_session(), path, **kwargs)
+        request = GetUploadLinkRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def upload(self, path_or_file, dst_path, **kwargs):
+        return (await request.process(yadisk=self)).href
+
+    async def _upload(self,
+                      get_upload_link_function: Callable,
+                      file_or_path: Union[str, bytes, IO],
+                      dst_path: str, /, **kwargs) -> None:
+        try:
+            timeout = kwargs["timeout"]
+        except KeyError:
+            timeout = settings.DEFAULT_UPLOAD_TIMEOUT
+
+        retry_interval = kwargs.get("retry_interval")
+
+        if retry_interval is None:
+            retry_interval = settings.DEFAULT_UPLOAD_RETRY_INTERVAL
+
+        n_retries = kwargs.get("n_retries")
+
+        if n_retries is None:
+            n_retries = settings.DEFAULT_N_RETRIES
+
+        kwargs["timeout"] = timeout
+
+        file = None
+        close_file = False
+
+        session = self.get_session()
+
+        try:
+            if isinstance(file_or_path, (str, bytes)):
+                close_file = True
+                file = open(file_or_path, "rb")
+            else:
+                close_file = False
+                file = file_or_path
+
+            file_position = file.tell()
+
+            async def attempt():
+                temp_kwargs = dict(kwargs)
+                temp_kwargs["n_retries"] = 0
+                temp_kwargs["retry_interval"] = 0.0
+
+                link = await get_upload_link_function(dst_path, **temp_kwargs)
+
+                # session.put() doesn't accept these parameters
+                for k in ("n_retries", "retry_interval", "overwrite", "fields"):
+                    temp_kwargs.pop(k, None)
+
+                # Disable keep-alive by default, since the upload server is random
+                try:
+                    temp_kwargs["headers"].setdefault("Connection", "close")
+                except KeyError:
+                    temp_kwargs["headers"] = {"Connection": "close"}
+
+                file.seek(file_position)
+
+                # UnclosableFile is used here to prevent aiohttp from closing the file
+                # after uploading it
+                async with session.put(link, data=UnclosableFile(file), **temp_kwargs) as response:
+                    if response.status != 201:
+                        raise await get_exception(response)
+
+            await auto_retry(attempt, n_retries, retry_interval)
+        finally:
+            if close_file and file is not None:
+                file.close()
+
+    async def upload(self,
+                     path_or_file: Union[str, bytes, IO],
+                     dst_path: str, /, **kwargs) -> ResourceLinkObject:
         """
             Upload a file to disk.
 
@@ -351,11 +644,42 @@ class YaDisk(object):
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
+
+            :raises ParentNotFoundError: parent directory doesn't exist
+            :raises PathExistsError: destination path already exists
+            :raises InsufficientStorageError: cannot upload file due to lack of storage space
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises UploadTrafficLimitExceededError: upload limit has been exceeded
+
+            :returns: :any:`ResourceLinkObject`, link to the destination resource
         """
 
-        await functions.upload(self.get_session(), path_or_file, dst_path, **kwargs)
+        await self._upload(self.get_upload_link, path_or_file, dst_path, **kwargs)
 
-    async def get_download_link(self, path, **kwargs):
+        return ResourceLinkObject.from_path(dst_path, yadisk=self)
+
+    async def upload_by_link(self,
+                             file_or_path: Union[str, bytes, IO],
+                             link: str, /, **kwargs) -> None:
+        """
+            Upload a file to disk using an upload link.
+
+            :param file_or_path: path or file-like object to be uploaded
+            :param link: upload link
+            :param overwrite: if `True`, the resource will be overwritten if it already exists,
+                              an error will be raised otherwise
+            :param timeout: `float` or `tuple`, request timeout
+            :param headers: `dict` or `None`, additional request headers
+            :param n_retries: `int`, maximum number of retries
+            :param retry_interval: delay between retries in seconds
+
+            :raises InsufficientStorageError: cannot upload file due to lack of storage space
+        """
+
+        await self._upload(lambda *args, **kwargs: link, file_or_path, "", **kwargs)
+
+    async def get_download_link(self, path: str, /, **kwargs) -> str:
         """
             Get a download link for a file (or a directory).
 
@@ -366,12 +690,92 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
             :returns: `str`
         """
 
-        return await functions.get_download_link(self.get_session(), path, **kwargs)
+        request = GetDownloadLinkRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def download(self, src_path, path_or_file, **kwargs):
+        return (await request.process(yadisk=self)).href
+
+    async def _download(self,
+                        get_download_link_function: Callable,
+                        src_path: str,
+                        file_or_path: Union[str, bytes, IO], /, **kwargs) -> None:
+        n_retries = kwargs.get("n_retries")
+
+        if n_retries is None:
+            n_retries = settings.DEFAULT_N_RETRIES
+
+        retry_interval = kwargs.get("retry_interval")
+
+        if retry_interval is None:
+            retry_interval = settings.DEFAULT_RETRY_INTERVAL
+
+        try:
+            timeout = kwargs["timeout"]
+        except KeyError:
+            timeout = settings.DEFAULT_TIMEOUT
+
+        kwargs["timeout"] = timeout
+
+        file = None
+        close_file = False
+
+        session = self.get_session()
+
+        try:
+            if isinstance(file_or_path, (str, bytes)):
+                close_file = True
+                file = open(file_or_path, "wb")
+            else:
+                close_file = False
+                file = file_or_path
+
+            file_position = file.tell()
+
+            async def attempt():
+                temp_kwargs = dict(kwargs)
+                temp_kwargs["n_retries"] = 0
+                temp_kwargs["retry_interval"] = 0.0
+                link = await get_download_link_function(src_path, **temp_kwargs)
+
+                # session.get() doesn't accept these parameters
+                for k in ("n_retries", "retry_interval", "fields"):
+                    temp_kwargs.pop(k, None)
+
+                # Disable keep-alive by default, since the download server is random
+                try:
+                    temp_kwargs["headers"].setdefault("Connection", "close")
+                except KeyError:
+                    temp_kwargs["headers"] = {"Connection": "close"}
+
+                file.seek(file_position)
+
+                async with session.get(link, **temp_kwargs) as response:
+                    while True:
+                        chunk = await response.content.read(8192)
+
+                        if not chunk:
+                            break
+
+                        file.write(chunk)
+
+                    if response.status != 200:
+                        raise await get_exception(response)
+
+            await auto_retry(attempt, n_retries, retry_interval)
+        finally:
+            if close_file and file is not None:
+                file.close()
+
+    async def download(self,
+                       src_path: str,
+                       path_or_file: Union[str, bytes, IO], /, **kwargs) -> ResourceLinkObject:
         """
             Download the file.
 
@@ -381,11 +785,35 @@ class YaDisk(object):
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
+
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject`, link to the source resource
         """
 
-        await functions.download(self.get_session(), src_path, path_or_file, **kwargs)
+        await self._download(self.get_download_link, src_path, path_or_file, **kwargs)
 
-    async def remove(self, path, **kwargs):
+        return ResourceLinkObject.from_path(src_path, yadisk=self)
+
+    async def download_by_link(self,
+                               link: str,
+                               file_or_path: Union[str, bytes, IO], /, **kwargs) -> None:
+        """
+            Download the file from the link.
+
+            :param link: download link
+            :param file_or_path: destination path or file-like object
+            :param timeout: `float` or `tuple`, request timeout
+            :param headers: `dict` or `None`, additional request headers
+            :param n_retries: `int`, maximum number of retries
+            :param retry_interval: delay between retries in seconds
+        """
+
+        await self._download(lambda *args, **kwargs: link, "", file_or_path, **kwargs)
+
+    async def remove(self, path: str, /, **kwargs) -> Optional["OperationLinkObject"]:
         """
             Remove the resource.
 
@@ -400,12 +828,20 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises BadRequestError: MD5 check is only available for files
+            :raises ResourceIsLockedError: resource is locked by another request
+
             :returns: :any:`OperationLinkObject` if the operation is performed asynchronously, `None` otherwise
         """
 
-        return await functions.remove(self.get_session(), path, **kwargs)
+        request = DeleteRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def mkdir(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def mkdir(self, path: str, /, **kwargs) -> ResourceLinkObject:
         """
             Create a new directory.
 
@@ -416,12 +852,21 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject`
+            :raises ParentNotFoundError: parent directory doesn't exist
+            :raises DirectoryExistsError: destination path already exists
+            :raises InsufficientStorageError: cannot create directory due to lack of storage space
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject`
         """
 
-        return await functions.mkdir(self.get_session(), path, **kwargs)
+        request = MkdirRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def check_token(self, token=None, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def check_token(self, token: Optional[str] = None, /, **kwargs) -> bool:
         """
             Check whether the token is valid.
 
@@ -434,9 +879,19 @@ class YaDisk(object):
             :returns: `bool`
         """
 
-        return await functions.check_token(self.get_session(token), **kwargs)
+        # Any ID will do, doesn't matter whether it exists or not
+        fake_operation_id = "0000"
 
-    async def get_trash_meta(self, path, **kwargs):
+        try:
+            # get_operation_status() doesn't require any permissions, unlike most other requests
+            await self._get_operation_status(self.get_session(token), fake_operation_id, **kwargs)
+            return True
+        except UnauthorizedError:
+            return False
+        except OperationNotFoundError:
+            return True
+
+    async def get_trash_meta(self, path: str, /, **kwargs) -> "TrashResourceObject":
         """
             Get meta information about a trash resource.
 
@@ -452,12 +907,18 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: :any:`TrashResourceObject`
         """
 
-        return await functions.get_trash_meta(self.get_session(), path, **kwargs)
+        request = GetTrashRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def trash_exists(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def trash_exists(self, path: str, /, **kwargs) -> bool:
         """
             Check whether the trash resource at `path` exists.
 
@@ -467,29 +928,16 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `bool`
         """
 
-        return await functions.trash_exists(self.get_session(), path, **kwargs)
+        return await _exists(self.get_trash_meta, path, **kwargs)
 
-    async def get_operation_status(self, operation_id, **kwargs):
-        """
-            Get operation status.
-
-            :param operation_id: ID of the operation or a link
-            :param fields: list of keys to be included in the response
-            :param timeout: `float` or `tuple`, request timeout
-            :param headers: `dict` or `None`, additional request headers
-            :param n_retries: `int`, maximum number of retries
-            :param retry_interval: delay between retries in seconds
-
-            :returns: `str`
-        """
-
-        return await functions.get_operation_status(self.get_session(), operation_id,
-                                                    **kwargs)
-
-    async def copy(self, src_path, dst_path, **kwargs):
+    async def copy(self,
+                   src_path: str,
+                   dst_path: str, /, **kwargs) -> Union[ResourceLinkObject, "OperationLinkObject"]:
         """
             Copy `src_path` to `dst_path`.
             If the operation is performed asynchronously, returns the link to the operation,
@@ -506,12 +954,24 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises PathExistsError: destination path already exists
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises InsufficientStorageError: cannot complete request due to lack of storage space
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises UploadTrafficLimitExceededError: upload limit has been exceeded
+
+            :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
-        return await functions.copy(self.get_session(), src_path, dst_path, **kwargs)
+        request = CopyRequest(self.get_session(), src_path, dst_path, **kwargs)
+        await request.send()
 
-    async def restore_trash(self, path, dst_path=None, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def restore_trash(self,
+                            path: str,
+                            dst_path: Optional[str] = None, /, **kwargs) -> Union[ResourceLinkObject, "OperationLinkObject"]:
         """
             Restore a trash resource.
             Returns a link to the newly created resource or a link to the asynchronous operation.
@@ -526,12 +986,24 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises PathExistsError: destination path already exists
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
-        return await functions.restore_trash(self.get_session(), path, dst_path, **kwargs)
+        kwargs["dst_path"] = dst_path
 
-    async def move(self, src_path, dst_path, **kwargs):
+        request = RestoreTrashRequest(self.get_session(), path, **kwargs)
+        await request.send()
+
+        return await request.process(yadisk=self)
+
+    async def move(self,
+                   src_path: str,
+                   dst_path: str, /, **kwargs) -> Union["OperationLinkObject", ResourceLinkObject]:
         """
             Move `src_path` to `dst_path`.
 
@@ -545,12 +1017,55 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`OperationLinkObject` or :any:`LinkObject`
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises PathExistsError: destination path already exists
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
-        return await functions.move(self.get_session(), src_path, dst_path, **kwargs)
+        request = MoveRequest(self.get_session(), src_path, dst_path, **kwargs)
+        await request.send()
 
-    async def remove_trash(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def rename(self,
+                     src_path: str,
+                     new_name: str, /, **kwargs) -> Union[ResourceLinkObject, "OperationLinkObject"]:
+        """
+            Rename `src_path` to have filename `new_name`.
+            Does the same as `move()` but changes only the filename.
+
+            :param src_path: source path to be moved
+            :param new_name: target filename to rename to
+            :param overwrite: `bool`, determines whether to overwrite the destination
+            :param force_async: forces the operation to be executed asynchronously
+            :param fields: list of keys to be included in the response
+            :param timeout: `float` or `tuple`, request timeout
+            :param headers: `dict` or `None`, additional request headers
+            :param n_retries: `int`, maximum number of retries
+            :param retry_interval: delay between retries in seconds
+
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises PathExistsError: destination path already exists
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises ValueError: `new_name` is not a valid filename
+
+            :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
+        """
+
+        new_name = new_name.rstrip("/")
+
+        if "/" in new_name or new_name in (".", ".."):
+            raise ValueError(f"Invalid filename: {new_name}")
+
+        dst_path = str(PurePosixPath(src_path).parent / new_name)
+
+        return await self.move(src_path, dst_path, **kwargs)
+
+    async def remove_trash(self, path: str, /, **kwargs) -> Optional["OperationLinkObject"]:
         """
             Remove a trash resource.
 
@@ -562,12 +1077,19 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
             :returns: :any:`OperationLinkObject` if the operation is performed asynchronously, `None` otherwise
         """
 
-        return await functions.remove_trash(self.get_session(), path, **kwargs)
+        request = DeleteTrashRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def publish(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def publish(self, path: str, /, **kwargs) -> ResourceLinkObject:
         """
             Make a resource public.
 
@@ -578,12 +1100,19 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject`, link to the resource
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject`, link to the resource
         """
 
-        return await functions.publish(self.get_session(), path, **kwargs)
+        request = PublishRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def unpublish(self, path, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def unpublish(self, path: str, /, **kwargs) -> ResourceLinkObject:
         """
             Make a public resource private.
 
@@ -594,12 +1123,19 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject`, link to the resource
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`ResourceLinkObject`
         """
 
-        return await functions.unpublish(self.get_session(), path, **kwargs)
+        request = UnpublishRequest(self.get_session(), path, **kwargs)
+        await request.send()
 
-    async def save_to_disk(self, public_key, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def save_to_disk(self, public_key: str, /, **kwargs) -> Union[ResourceLinkObject, "OperationLinkObject"]:
         """
             Saves a public resource to the disk.
             Returns the link to the operation if it's performed asynchronously,
@@ -616,12 +1152,21 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: :any:`LinkObject` or :any:`OperationLinkObject`
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises InsufficientStorageError: cannot upload file due to lack of storage space
+            :raises UploadTrafficLimitExceededError: upload limit has been exceeded
+
+            :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
-        return await functions.save_to_disk(self.get_session(), public_key, **kwargs)
+        request = SaveToDiskRequest(self.get_session(), public_key, **kwargs)
+        await request.send()
 
-    async def get_public_meta(self, public_key, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def get_public_meta(self, public_key: str, /, **kwargs) -> "PublicResourceObject":
         """
             Get meta-information about a public resource.
 
@@ -640,12 +1185,18 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: :any:`PublicResourceObject`
         """
 
-        return await functions.get_public_meta(self.get_session(), public_key, **kwargs)
+        request = GetPublicMetaRequest(self.get_session(), public_key, **kwargs)
+        await request.send()
 
-    async def public_exists(self, public_key, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def public_exists(self, public_key: str, /, **kwargs) -> bool:
         """
             Check whether the public resource exists.
 
@@ -656,12 +1207,14 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `bool`
         """
 
-        return await functions.public_exists(self.get_session(), public_key, **kwargs)
+        return await _exists(self.get_public_meta, public_key, **kwargs)
 
-    async def public_listdir(self, public_key, **kwargs):
+    async def public_listdir(self, public_key: str, /, **kwargs) -> AsyncGenerator["PublicResourceObject", None]:
         """
             Get contents of a public directory.
 
@@ -679,12 +1232,16 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises WrongResourceTypeError: resource is not a directory
+
             :returns: generator of :any:`PublicResourceObject`
         """
 
-        return await functions.public_listdir(self.get_session(), public_key, **kwargs)
+        return _listdir(self.get_public_meta, public_key, **kwargs)
 
-    async def get_public_type(self, public_key, **kwargs):
+    async def get_public_type(self, public_key: str, /, **kwargs) -> str:
         """
             Get public resource type.
 
@@ -695,12 +1252,15 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: "file" or "dir"
         """
 
-        return await functions.get_public_type(self.get_session(), public_key, **kwargs)
+        return await _get_type(self.get_public_meta, public_key, **kwargs)
 
-    async def is_public_dir(self, public_key, **kwargs):
+    async def is_public_dir(self, public_key: str, /, **kwargs) -> bool:
         """
             Check whether `public_key` is a public directory.
 
@@ -711,12 +1271,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `public_key` is a directory, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_public_dir(self.get_session(), public_key, **kwargs)
+        try:
+            return (await self.get_public_type(public_key, **kwargs)) == "dir"
+        except PathNotFoundError:
+            return False
 
-    async def is_public_file(self, public_key, **kwargs):
+    async def is_public_file(self, public_key: str, /, **kwargs) -> bool:
         """
             Check whether `public_key` is a public file.
 
@@ -727,12 +1292,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `public_key` is a file, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_public_file(self.get_session(), public_key, **kwargs)
+        try:
+            return (await self.get_public_type(public_key, **kwargs)) == "file"
+        except PathNotFoundError:
+            return False
 
-    async def trash_listdir(self, path, **kwargs):
+    async def trash_listdir(self, path: str, /, **kwargs) -> AsyncGenerator["TrashResourceObject", None]:
         """
             Get contents of a trash resource.
 
@@ -747,12 +1317,16 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises WrongResourceTypeError: resource is not a directory
+
             :returns: generator of :any:`TrashResourceObject`
         """
 
-        return await functions.trash_listdir(self.get_session(), path, **kwargs)
+        return _listdir(self.get_trash_meta, path, **kwargs)
 
-    async def get_trash_type(self, path, **kwargs):
+    async def get_trash_type(self, path: str, /, **kwargs) -> str:
         """
             Get trash resource type.
 
@@ -762,12 +1336,15 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: "file" or "dir"
         """
 
-        return await functions.get_trash_type(self.get_session(), path, **kwargs)
+        return await _get_type(self.get_trash_meta, path, **kwargs)
 
-    async def is_trash_dir(self, path, **kwargs):
+    async def is_trash_dir(self, path: str, /, **kwargs) -> bool:
         """
             Check whether `path` is a trash directory.
 
@@ -777,12 +1354,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_trash_dir(self.get_session(), path, **kwargs)
+        try:
+            return (await self.get_trash_type(path, **kwargs)) == "dir"
+        except PathNotFoundError:
+            return False
 
-    async def is_trash_file(self, path, **kwargs):
+    async def is_trash_file(self, path: str, /, **kwargs) -> bool:
         """
             Check whether `path` is a trash file.
 
@@ -792,12 +1374,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
 
-        return await functions.is_trash_file(self.get_session(), path, **kwargs)
+        try:
+            return (await self.get_trash_type(path, **kwargs)) == "file"
+        except PathNotFoundError:
+            return False
 
-    async def get_public_resources(self, **kwargs):
+    async def get_public_resources(self, **kwargs) -> "PublicResourcesListObject":
         """
             Get a list of public resources.
 
@@ -812,12 +1399,17 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: :any:`PublicResourcesListObject`
         """
 
-        return await functions.get_public_resources(self.get_session(), **kwargs)
+        request = GetPublicResourcesRequest(self.get_session(), **kwargs)
+        await request.send()
 
-    async def patch(self, path, properties, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def patch(self, path: str, properties: dict, /, **kwargs) -> "ResourceObject":
         """
             Update custom properties of a resource.
 
@@ -829,12 +1421,19 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
             :returns: :any:`ResourceObject`
         """
 
-        return await functions.patch(self.get_session(), path, properties, **kwargs)
+        request = PatchRequest(self.get_session(), path, properties, **kwargs)
+        await request.send()
 
-    async def get_files(self, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def get_files(self, **kwargs) -> AsyncGenerator["ResourceObject", None]:
         """
             Get a flat list of all files (that doesn't include directories).
 
@@ -850,12 +1449,35 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
             :returns: generator of :any:`ResourceObject`
         """
 
-        return await functions.get_files(self.get_session(), **kwargs)
+        if kwargs.get("limit") is not None:
+            request = FilesRequest(self.get_session(), **kwargs)
+            await request.send()
 
-    async def get_last_uploaded(self, **kwargs):
+            for i in (await request.process(yadisk=self)).items:
+                yield i
+
+            return
+
+        kwargs.setdefault("offset", 0)
+        kwargs["limit"] = 1000
+
+        while True:
+            counter = 0
+            async for i in self.get_files(**kwargs):
+                counter += 1
+                yield i
+
+            if counter < kwargs["limit"]:
+                break
+
+            kwargs["offset"] += kwargs["limit"]
+
+    async def get_last_uploaded(self, **kwargs) -> AsyncGenerator["ResourceObject", None]:
         """
             Get the list of latest uploaded files sorted by upload date.
 
@@ -869,12 +1491,18 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
-            :returns: generator of :any:`LastUploadedResourceListObject`
+            :raises ForbiddenError: application doesn't have enough rights for this request
+
+            :returns: generator of :any:`ResourceObject`
         """
 
-        return await functions.get_last_uploaded(self.get_session(), **kwargs)
+        request = LastUploadedRequest(self.get_session(), **kwargs)
+        await request.send()
 
-    async def upload_url(self, url, path, **kwargs):
+        for i in (await request.process(yadisk=self)).items:
+            yield i
+
+    async def upload_url(self, url: str, path: str, /, **kwargs) -> "OperationLinkObject":
         """
             Upload a file from URL.
 
@@ -887,12 +1515,22 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises ParentNotFoundError: parent directory doesn't exist
+            :raises PathExistsError: destination path already exists
+            :raises InsufficientStorageError: cannot upload file due to lack of storage space
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+            :raises UploadTrafficLimitExceededError: upload limit has been exceeded
+
             :returns: :any:`OperationLinkObject`, link to the asynchronous operation
         """
 
-        return await functions.upload_url(self.get_session(), url, path, **kwargs)
+        request = UploadURLRequest(self.get_session(), url, path, **kwargs)
+        await request.send()
 
-    async def get_public_download_link(self, public_key, **kwargs):
+        return await request.process(yadisk=self)
+
+    async def get_public_download_link(self, public_key: str, /, **kwargs) -> str:
         """
             Get a download link for a public resource.
 
@@ -904,13 +1542,21 @@ class YaDisk(object):
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
 
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
             :returns: `str`
         """
 
-        return await functions.get_public_download_link(self.get_session(),
-                                                  public_key, **kwargs)
+        request = GetPublicDownloadLinkRequest(self.get_session(), public_key, **kwargs)
+        await request.send()
 
-    async def download_public(self, public_key, file_or_path, **kwargs):
+        return (await request.process(yadisk=self)).href
+
+    async def download_public(self,
+                              public_key: str,
+                              file_or_path: Union[str, bytes, IO], /, **kwargs) -> PublicResourceLinkObject:
         """
             Download the public resource.
 
@@ -921,7 +1567,39 @@ class YaDisk(object):
             :param headers: `dict` or `None`, additional request headers
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
+
+            :raises PathNotFoundError: resource was not found on Disk
+            :raises ForbiddenError: application doesn't have enough rights for this request
+            :raises ResourceIsLockedError: resource is locked by another request
+
+            :returns: :any:`PublicResourceLinkObject`
         """
 
-        await functions.download_public(self.get_session(), public_key, file_or_path,
-                                        **kwargs)
+        await self._download(
+            lambda *args, **kwargs: self.get_public_download_link(public_key),
+            "", file_or_path, **kwargs)
+        return PublicResourceLinkObject.from_public_key(public_key, yadisk=self)
+
+    async def get_operation_status(self, operation_id, **kwargs):
+        """
+            Get operation status.
+
+            :param operation_id: ID of the operation or a link
+            :param fields: list of keys to be included in the response
+            :param timeout: `float` or `tuple`, request timeout
+            :param headers: `dict` or `None`, additional request headers
+            :param n_retries: `int`, maximum number of retries
+            :param retry_interval: delay between retries in seconds
+
+            :raises OperationNotFoundError: requested operation was not found
+
+            :returns: `str`
+        """
+
+        return await self._get_operation_status(self.get_session(), operation_id, **kwargs)
+
+    async def _get_operation_status(self, session: SessionWithHeaders, operation_id: str, **kwargs) -> str:
+        request = GetOperationStatusRequest(session, operation_id, **kwargs)
+        await request.send()
+
+        return (await request.process()).status

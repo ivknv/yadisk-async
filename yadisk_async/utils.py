@@ -9,6 +9,10 @@ from .objects import ErrorObject
 from .exceptions import *
 from . import settings
 
+from typing import Optional, Union, TypeVar
+
+from .compat import Callable
+
 __all__ = ["get_exception", "auto_retry"]
 
 EXCEPTION_MAP = {400: defaultdict(lambda: BadRequestError,
@@ -26,15 +30,16 @@ EXCEPTION_MAP = {400: defaultdict(lambda: BadRequestError,
                                    "MD5DifferError": MD5DifferError}),
                  415: defaultdict(lambda: UnsupportedMediaError),
                  423: defaultdict(lambda: LockedError,
-                                  {"DiskResourceLockedError": ResourceIsLockedError}),
+                                  {"DiskResourceLockedError": ResourceIsLockedError,
+                                   "DiskUploadTrafficLimitExceeded": UploadTrafficLimitExceededError}),
                  429: defaultdict(lambda: TooManyRequestsError),
                  500: defaultdict(lambda: InternalServerError),
                  502: defaultdict(lambda: BadGatewayError),
                  503: defaultdict(lambda: UnavailableError),
                  504: defaultdict(lambda: GatewayTimeoutError),
-                 509: defaultdict(lambda: InsufficientStorageError)}
+                 507: defaultdict(lambda: InsufficientStorageError)}
 
-async def get_exception(response):
+async def get_exception(response: aiohttp.client.ClientResponse) -> YaDiskError:
     """
         Get an exception instance based on response, assuming the request has failed.
 
@@ -62,7 +67,11 @@ async def get_exception(response):
 
     return exc(error.error, "%s (%s / %s)" % (msg, desc, error.error), response)
 
-async def auto_retry(func, n_retries=None, retry_interval=None):
+T = TypeVar("T")
+
+async def auto_retry(func: Callable[[], T],
+                     n_retries: Optional[int] = None,
+                     retry_interval: Optional[Union[int, float]] = None) -> T:
     """
         Attempt to perform a request with automatic retries.
         A retry is triggered by :any:`aiohttp.ClientError` or :any:`RetriableYaDiskError`.
@@ -92,3 +101,6 @@ async def auto_retry(func, n_retries=None, retry_interval=None):
 
         if retry_interval:
             await asyncio.sleep(retry_interval)
+
+    # This should never be reachable
+    assert False

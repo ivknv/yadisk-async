@@ -3,12 +3,13 @@
 __all__ = ["YaDiskError", "RetriableYaDiskError", "UnknownYaDiskError",
            "WrongResourceTypeError",  "BadRequestError", "UnauthorizedError",
            "ForbiddenError", "NotFoundError", "NotAcceptableError",
-           "ConflictError", "UnsupportedMediaError", "LockedError",
-           "TooManyRequestsError", "InternalServerError", "BadGatewayError",
-           "UnavailableError", "GatewayTimeoutError", "InsufficientStorageError",
-           "PathNotFoundError", "ParentNotFoundError", "PathExistsError",
-           "DirectoryExistsError", "FieldValidationError", "ResourceIsLockedError",
-           "MD5DifferError", "OperationNotFoundError"]
+           "ConflictError", "PayloadTooLargeError", "UnsupportedMediaError",
+           "LockedError", "UploadTrafficLimitExceededError", "TooManyRequestsError",
+           "InternalServerError", "BadGatewayError", "UnavailableError",
+           "GatewayTimeoutError", "InsufficientStorageError", "PathNotFoundError",
+           "ParentNotFoundError", "PathExistsError", "DirectoryExistsError",
+           "FieldValidationError", "ResourceIsLockedError", "MD5DifferError",
+           "OperationNotFoundError", "InvalidResponseError"]
 
 class YaDiskError(Exception):
     """
@@ -68,12 +69,20 @@ class ConflictError(YaDiskError):
     """Thrown when the server returns code 409."""
     pass
 
+class PayloadTooLargeError(YaDiskError):
+    """Thrown when the server returns code 413."""
+    pass
+
 class UnsupportedMediaError(YaDiskError):
     """Thrown when the server returns code 415."""
     pass
 
 class LockedError(YaDiskError):
     """Thrown when the server returns code 423."""
+    pass
+
+class UploadTrafficLimitExceededError(LockedError):
+    """Thrown when upload limit has been exceeded."""
     pass
 
 class TooManyRequestsError(YaDiskError):
@@ -97,7 +106,7 @@ class GatewayTimeoutError(RetriableYaDiskError):
     pass
 
 class InsufficientStorageError(YaDiskError):
-    """Thrown when the server returns code 509."""
+    """Thrown when the server returns code 507."""
     pass
 
 class PathNotFoundError(NotFoundError):
@@ -130,4 +139,8 @@ class MD5DifferError(ConflictError):
 
 class OperationNotFoundError(NotFoundError):
     """Thrown by `get_operation_status()` when the operation doesn't exist."""
+    pass
+
+class InvalidResponseError(YaDiskError):
+    """Thrown when Yandex.Disk did not return a JSON response or if it's invalid."""
     pass
