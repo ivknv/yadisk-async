@@ -154,6 +154,25 @@ class YaDisk:
         :ivar id: `str`, application ID
         :ivar secret: `str`, application secret password
         :ivar token: `str`, application token
+
+        The following exceptions may be raised by most API requests:
+
+        :raises BadRequestError: server returned HTTP code 400
+        :raises FieldValidationError: request contains fields with invalid data
+        :raises UnauthorizedError: server returned HTTP code 401
+        :raises ForbiddenError: server returned HTTP code 403
+        :raises NotAcceptableError: server returned HTTP code 406
+        :raises ConflictError: server returned HTTP code 409
+        :raises PayloadTooLargeError: server returned code 413
+        :raises UnsupportedMediaError: server returned HTTP code 415
+        :raises LockedError: server returned HTTP code 423
+        :raises TooManyRequestsError: server returned HTTP code 429
+        :raises InternalServerError: server returned HTTP code 500
+        :raises BadGatewayError: server returned HTTP code 502
+        :raises UnavailableError: server returned HTTP code 503
+        :raises GatewayTimeoutError: server returned HTTP code 504
+        :raises InsufficientStorageError: server returned HTTP code 509
+        :raises UnknownYaDiskError: other unknown error
     """
 
     id: str
@@ -199,20 +218,16 @@ class YaDisk:
     def clear_session_cache(self) -> None:
         """
             Clears the session cache. Unused sessions will NOT be closed.
-
-            This method is not a coroutine.
         """
 
         self._sessions.clear()
 
     def make_session(self, token: Optional[str] = None) -> SessionWithHeaders:
         """
-            Prepares :any:`yadisk_async.session.SessionWithHeaders` object with headers needed for API.
-
-            This method is not a coroutine.
+            Prepares :any:`aiohttp.ClientSession` object with headers needed for API.
 
             :param token: application token, equivalent to `self.token` if `None`
-            :returns: `yadisk_async.session.SessionWithHeaders`
+            :returns: `aiohttp.ClientSession`
         """
 
         if token is None:
@@ -229,9 +244,7 @@ class YaDisk:
         """
             Like :any:`YaDisk.make_session` but cached.
 
-            This method is not a coroutine.
-
-            :returns: :any:`yadisk_async.session.SessionWithHeaders`, different instances for different threads
+            :returns: :any:`aiohttp.ClientSession`, different instances for different threads
         """
 
         if token is None:
@@ -242,8 +255,6 @@ class YaDisk:
     def get_auth_url(self, **kwargs) -> str:
         """
             Get authentication URL for the user to go to.
-
-            This method is not a coroutine.
 
             :param type: response type ("code" to get the confirmation code or "token" to get the token automatically)
             :param device_id: unique device ID, must be between 6 and 50 characters
@@ -301,8 +312,6 @@ class YaDisk:
         """
             Get the URL for the user to get the confirmation code.
             The confirmation code can later be used to get the token.
-
-            This method is not a coroutine.
 
             :param device_id: unique device ID, must be between 6 and 50 characters
             :param device_name: device name, should not be longer than 100 characters

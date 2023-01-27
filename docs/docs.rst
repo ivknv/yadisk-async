@@ -2,6 +2,9 @@
 Documentation
 =============
 
+YaDisk object
+#############
+
 .. autoclass:: yadisk_async.YaDisk
    :members:
 
@@ -60,7 +63,9 @@ Objects
 
 .. automodule:: yadisk_async.objects.resources
    :members:
+   :inherited-members:
    :show-inheritance:
+   :exclude-members: import_fields,set_alias,remove_alias,remove_field,set_field_type,set_field_types
 
 .. automodule:: yadisk_async.objects.operations
    :members:
@@ -73,21 +78,6 @@ Utilities
 *********
 
 .. automodule:: yadisk_async.utils
-   :members:
-
-Functions
-*********
-
-.. automodule:: yadisk_async.functions.auth
-   :members:
-
-.. automodule:: yadisk_async.functions.disk
-   :members:
-
-.. automodule:: yadisk_async.functions.resources
-   :members:
-
-.. automodule:: yadisk_async.functions.operations
    :members:
 
 API request objects

@@ -1066,7 +1066,7 @@ class PatchRequest(APIRequest):
     """
         A request to update custom properties of a resource.
 
-        :param session: an instance of `aiohttp.ClientSession` with prepared headers
+        :param session: an instance of :any:`aiohttp.ClientSession` with prepared headers
         :param path: path to the resource
         :param properties: `dict`, custom properties to update
         :param fields: list of keys to be included in the response

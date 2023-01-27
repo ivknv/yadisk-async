@@ -20,7 +20,7 @@ class APIRequest:
     """
         Base class for all API requests.
 
-        :param session: an instance of `yadisk_async.session.SessionWithHeaders`
+        :param session: an instance of :any:`aiohttp.ClientSession`
         :param args: `dict` of arguments, that will be passed to `process_args`
         :param timeout: `float` or `tuple`, request timeout
         :param headers: `dict` or `None`, additional request headers
