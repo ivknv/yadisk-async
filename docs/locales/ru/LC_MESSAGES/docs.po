@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: YaDisk 1.3.5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-01-29 07:45+0500\n"
+"POT-Creation-Date: 2023-01-29 12:05+0500\n"
 "PO-Revision-Date: 2018-01-20 15:41+0500\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -2061,7 +2061,9 @@ msgstr "Загружает файл на диск."
 #: yadisk_async.yadisk.YaDisk.upload:3
 #: yadisk_async.yadisk.YaDisk.upload_by_link:3
 msgid "path, file-like object or an async generator function to be uploaded"
-msgstr "путь к файлу, файл-подобный объект или функция, возвращающая асинхронный генератор для загрузки"
+msgstr ""
+"путь к файлу, файл-подобный объект или функция, возвращающая асинхронный "
+"генератор для загрузки"
 
 #: of yadisk_async.objects.resources.ResourceObjectMethodsMixin.upload:5
 #: yadisk_async.yadisk.YaDisk.upload:5
@@ -2651,24 +2653,48 @@ msgid "`str`, path to the VKontakte folder"
 msgstr "`str`, путь к папке ВКонтакте"
 
 #: of yadisk_async.objects.disk.SystemFoldersObject:10
+msgid "`str`, path to the mail attachments folder"
+msgstr "`str`, путь к папке \"Почтовые вложения\""
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:11
 msgid "`str`, path to the My World folder"
 msgstr "`str`, путь к папке Моего Мира"
 
-#: of yadisk_async.objects.disk.SystemFoldersObject:11
+#: of yadisk_async.objects.disk.SystemFoldersObject:12
+msgid "`str`, path to the Downloads folder"
+msgstr "`str`, путь к папке \"Загрузки\""
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:13
+msgid "`str` path to the Applications folder"
+msgstr "`str`, путь к папке \"Приложения\""
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:14
 msgid "`str`, path to the Facebook folder"
 msgstr "`str`, путь к папке Facebook"
 
-#: of yadisk_async.objects.disk.SystemFoldersObject:12
+#: of yadisk_async.objects.disk.SystemFoldersObject:15
 msgid "`str`, path to the social networks folder"
 msgstr "`str`, путь к папке социальных сетей"
 
-#: of yadisk_async.objects.disk.SystemFoldersObject:13
+#: of yadisk_async.objects.disk.SystemFoldersObject:16
+msgid "`str`, path to the Messenger Files folder"
+msgstr "`str`, путь к папке \"Файлы Мессенджера\""
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:17
+msgid "`str`, path to the Meeting Materials folder"
+msgstr "`str`, путь к папке \"Материалы встреч\""
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:18
+msgid "`str`, path to the camera folder"
+msgstr "`str`, путь к папке фотокамеры"
+
+#: of yadisk_async.objects.disk.SystemFoldersObject:19
 msgid "`str`, path to the screenshot folder"
 msgstr "`str`, путь к папке скриншотов"
 
-#: of yadisk_async.objects.disk.SystemFoldersObject:14
-msgid "`str`, path to the camera folder"
-msgstr "`str`, путь к папке фотокамеры"
+#: of yadisk_async.objects.disk.SystemFoldersObject:20
+msgid "`str`, path to the Scans folder"
+msgstr "`str`, путь к папке \"Сканы\""
 
 #: of yadisk_async.objects.disk.UserObject:1
 msgid "User object."
