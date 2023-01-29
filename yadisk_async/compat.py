@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 
 __all__ = ["List", "Dict", "Set", "Callable", "Iterable", "Generator",
-           "AsyncGenerator", "Coroutine", "Awaitable", "TimeoutError"]
+           "AsyncGenerator", "Coroutine", "Awaitable", "TimeoutError", "AsyncIterable"]
 
 import sys
 
 if sys.version_info.major == 3 and sys.version_info.minor < 9:
     from typing import (
         List, Dict, Set, Callable, Iterable, Generator, AsyncGenerator,
-        Coroutine, Awaitable
+        Coroutine, Awaitable, AsyncIterable
     )
 else:
     from collections.abc import (
-        Callable, Iterable, Generator,AsyncGenerator, Coroutine, Awaitable
+        Callable, Iterable, Generator, AsyncGenerator, Coroutine, Awaitable,
+        AsyncIterable
     )
 
     List = list

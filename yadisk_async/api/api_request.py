@@ -156,6 +156,6 @@ class APIRequest:
             result = None
 
         try:
-            return self.process_json(result)
+            return self.process_json(result, **kwargs)
         except ValueError as e:
             raise InvalidResponseError(f"Server returned invalid response: {e}")

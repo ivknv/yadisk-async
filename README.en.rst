@@ -60,8 +60,16 @@ Examples
     with open("file_to_upload.txt", "rb") as f:
         await y.upload(f, "/destination.txt")
 
+    # Same but with aiofiles
+    async with aiofiles.open("file_to_upload.txt", "rb") as f:
+        await y.upload(f, "/destination.txt")
+
     # Download "/some-file-to-download.txt" to "downloaded.txt"
     await y.download("/some-file-to-download.txt", "downloaded.txt")
+
+    # Same but with aiofiles
+    async with aiofiles.open("downloaded.txt", "wb") as f:
+        await y.download("/some-file-to-download.txt", f)
 
     # Permanently remove "/file-to-remove"
     await y.remove("/file-to-remove", permanently=True)

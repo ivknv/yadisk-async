@@ -6,11 +6,12 @@ from urllib.parse import urlencode, urlparse, parse_qs
 
 from .yadisk_object import YaDiskObject
 from .disk import UserPublicInfoObject
-from ..common import typed_list, yandex_date, is_resource_link, is_public_resource_link
-from ..common import ensure_path_has_schema, str_or_error, int_or_error, bool_or_error
-from ..common import dict_or_error, str_or_dict_or_error
+from ..common import (
+    typed_list, yandex_date, is_resource_link, is_public_resource_link,
+    ensure_path_has_schema, str_or_error, int_or_error, bool_or_error,
+    dict_or_error, str_or_dict_or_error, FileOrPath, FileOrPathDestination)
 
-from typing import overload, Union, IO, AnyStr, Protocol, Optional, TYPE_CHECKING
+from typing import overload, Union, Protocol, Optional, TYPE_CHECKING
 
 from ..compat import AsyncGenerator, List
 
@@ -504,12 +505,12 @@ class ResourceObjectMethodsMixin:
         return await self._yadisk.get_upload_link(str(path), **kwargs)
 
     async def upload(self: ResourceProtocol,
-                     path_or_file: Union[str, IO[AnyStr]],
+                     path_or_file: FileOrPath,
                      relative_path: Optional[str] = None, /, **kwargs) -> "ResourceLinkObject":
         """
             Upload a file to disk.
 
-            :param path_or_file: path or file-like object to be uploaded
+            :param path_or_file: path, file-like object or an async generator function to be uploaded
             :param relative_path: `str` or `None`, destination path relative to the resource
             :param overwrite: if `True`, the resource will be overwritten if it already exists,
                               an error will be raised otherwise
@@ -604,13 +605,13 @@ class ResourceObjectMethodsMixin:
 
     @overload
     async def download(self: ResourceProtocol,
-                       dst_path_or_file: Union[str, IO[AnyStr]], /, **kwargs) -> "ResourceLinkObject":
+                       dst_path_or_file: FileOrPathDestination, /, **kwargs) -> "ResourceLinkObject":
         pass
 
     @overload
     async def download(self: ResourceProtocol,
                        relative_path: Optional[str],
-                       dst_path_or_file: Union[str, IO[AnyStr]], /, **kwargs) -> "ResourceLinkObject":
+                       dst_path_or_file: FileOrPathDestination, /, **kwargs) -> "ResourceLinkObject":
         pass
 
     async def download(self: ResourceProtocol, *args, **kwargs) -> "ResourceLinkObject":

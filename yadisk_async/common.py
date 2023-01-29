@@ -2,14 +2,14 @@
 
 import datetime
 
-from .compat import Callable, List
+from .compat import Callable, List, AsyncIterable
 
-from typing import Optional, TypeVar, Any, Union
+from typing import Optional, TypeVar, Any, Union, IO, Protocol
 
 __all__ = ["typed_list", "int_or_error", "str_or_error", "bool_or_error",
            "dict_or_error", "str_or_dict_or_error", "yandex_date", "is_operation_link",
            "is_resource_link", "is_public_resource_link", "ensure_path_has_schema",
-           "CaseInsensitiveDict"]
+           "FileOrPath", "FileOrPathDestination", "CaseInsensitiveDict"]
 
 T = TypeVar("T", bound=Callable)
 
@@ -94,6 +94,31 @@ def ensure_path_has_schema(path: str, default_schema: str = "disk") -> str:
         return default_schema + ":" + path
 
     return default_schema + ":/" + path
+
+class AsyncFileLike(Protocol):
+    async def read(self, size: int = ..., /) -> Union[str, bytes]: ...
+    async def write(self, buffer: Any, /) -> int: ...
+    async def seek(self, pos: int, whence: int = ..., /) -> int: ...
+    async def tell(self) -> int: ...
+
+class BinaryAsyncFileLike(Protocol):
+    async def read(self, size: int = ..., /) -> bytes: ...
+    async def write(self, buffer: Any, /) -> int: ...
+    async def seek(self, pos: int, whence: int = ..., /) -> int: ...
+    async def tell(self) -> int: ...
+
+FileOrPath = Union[
+    str,
+    bytes,
+    IO,
+    AsyncFileLike,
+    Callable[[], AsyncIterable[bytes, None]]]
+
+FileOrPathDestination = Union[
+    str,
+    bytes,
+    IO[bytes],
+    BinaryAsyncFileLike]
 
 # https://stackoverflow.com/a/32888599/3653520
 class CaseInsensitiveDict(dict):

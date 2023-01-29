@@ -9,7 +9,7 @@ from .objects import ErrorObject
 from .exceptions import *
 from . import settings
 
-from typing import Optional, Union, TypeVar
+from typing import Optional, Union, TypeVar, Protocol
 
 from .compat import Callable, Awaitable, TimeoutError
 

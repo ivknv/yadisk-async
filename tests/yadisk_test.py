@@ -3,23 +3,24 @@
 
 import asyncio
 import os
-import random
 import tempfile
+import aiofiles
 
 import posixpath
 from unittest import TestCase
 from io import BytesIO
 
+import yadisk_async
 import yadisk_async.settings
 from yadisk_async.common import is_operation_link, ensure_path_has_schema
 from yadisk_async.api.operations import GetOperationStatusRequest
+from typing import Optional
 
 yadisk_async.settings.DEFAULT_N_RETRIES = 50
-yadisk_async.settings.DEFAULT_UPLOAD_N_RETRIES = 50
 
 __all__ = ["YaDiskTestCase"]
 
-loop = None
+loop: Optional[asyncio.AbstractEventLoop] = None
 
 def async_test(f):
     def wrapper(*args, **kwargs):
@@ -39,7 +40,7 @@ class YaDiskTestCase(TestCase):
         if not os.environ.get("PYTHON_YADISK_TEST_ROOT"):
             raise ValueError("Environment variable PYTHON_YADISK_TEST_ROOT must be set")
 
-        self.path = os.environ.get("PYTHON_YADISK_TEST_ROOT")
+        self.path: str = os.environ["PYTHON_YADISK_TEST_ROOT"]
 
         # Get rid of 'disk:/' prefix in the path and make it start with a slash
         # for consistency
@@ -54,9 +55,10 @@ class YaDiskTestCase(TestCase):
         global loop
         loop = self.loop
 
-        self.yadisk = yadisk_async.YaDisk(os.environ.get("PYTHON_YADISK_APP_ID"),
-                                          os.environ.get("PYTHON_YADISK_APP_SECRET"),
-                                          os.environ.get("PYTHON_YADISK_APP_TOKEN"))
+        self.yadisk: yadisk_async.YaDisk = yadisk_async.YaDisk(
+            os.environ.get("PYTHON_YADISK_APP_ID"),
+            os.environ.get("PYTHON_YADISK_APP_SECRET"),
+            os.environ["PYTHON_YADISK_APP_TOKEN"])
 
     def __del__(self):
         if self.yadisk is None:
@@ -162,11 +164,8 @@ class YaDiskTestCase(TestCase):
         buf1 = BytesIO()
         buf2 = tempfile.NamedTemporaryFile("w+b")
 
-        orig_close = buf1.close
-
         def wrapper():
-            raise BaseException("WHERERA")
-            orig_close()
+            self.assertTrue(False)
 
         buf1.close = wrapper
 
@@ -183,6 +182,39 @@ class YaDiskTestCase(TestCase):
         buf2.seek(0)
 
         self.assertEqual(buf1.read(), buf2.read())
+
+    @async_test
+    async def test_upload_and_download_async(self):
+        content = b"0" * 1024 ** 2
+        async with aiofiles.tempfile.NamedTemporaryFile("wb+") as source:
+            await source.write(content)
+            await source.seek(0)
+
+            path1 = posixpath.join(self.path, "zeroes.txt")
+            path2 = posixpath.join(self.path, "zeroes_from_generator.txt")
+
+            await self.yadisk.upload(source, path1, overwrite=True, n_retries=50)
+
+            async def source_generator():
+                for _ in range(1024):
+                    yield b"0" * 1024
+
+            await self.yadisk.upload(source_generator, path2, overwrite=True, n_retries=50)
+
+        async with aiofiles.tempfile.NamedTemporaryFile("wb+") as destination:
+            await self.yadisk.download(path1, destination, n_retries=50)
+            await destination.seek(0)
+
+            self.assertEqual(content, await destination.read())
+            await self.yadisk.remove(path1, permanently=True)
+
+            await destination.seek(0)
+            await destination.truncate()
+            await self.yadisk.download(path2, destination, n_retries=50)
+            await destination.seek(0)
+
+            self.assertEqual(content, await destination.read())
+            await self.yadisk.remove(path2, permanently=True)
 
     @async_test
     async def test_check_token(self):

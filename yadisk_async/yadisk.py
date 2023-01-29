@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
+import inspect
 import threading
 from pathlib import PurePosixPath
 
 from urllib.parse import urlencode
 import io
+from .common import FileOrPath, FileOrPathDestination
 
 from . import settings
 from .session import SessionWithHeaders
@@ -14,14 +17,15 @@ from .exceptions import PathNotFoundError, WrongResourceTypeError
 from .utils import get_exception, auto_retry
 from .objects import ResourceLinkObject, PublicResourceLinkObject
 
-from typing import Optional, Union, IO, TYPE_CHECKING
+from typing import Any, Optional, Union, IO, TYPE_CHECKING
 from .compat import Callable, AsyncGenerator, List, Awaitable
 
 if TYPE_CHECKING:
-    from .objects import TokenObject, TokenRevokeStatusObject, DiskInfoObject
-    from .objects import ResourceObject, OperationLinkObject
-    from .objects import TrashResourceObject, PublicResourceObject
-    from .objects import PublicResourcesListObject
+    from .objects import (
+        TokenObject, TokenRevokeStatusObject, DiskInfoObject,
+        ResourceObject, OperationLinkObject,
+        TrashResourceObject, PublicResourceObject,
+        PublicResourcesListObject)
 
 __all__ = ["YaDisk"]
 
@@ -160,6 +164,19 @@ class UnclosableFile(io.IOBase):
 
     def writelines(self, *args, **kwargs) -> None:
         return self.file.writelines(*args, **kwargs)
+
+async def read_in_chunks(file: IO, chunk_size: int = 64 * 1024) -> Union[AsyncGenerator[str, None],
+                                                                         AsyncGenerator[bytes, None]]:
+    while chunk := await file.read(chunk_size):
+        yield chunk
+
+def is_async_func(func: Any) -> bool:
+    return inspect.isgeneratorfunction(func) or asyncio.iscoroutinefunction(func)
+
+def is_async_file(file: Any) -> bool:
+    read_method = getattr(file, "read", None)
+
+    return is_async_func(read_method)
 
 class YaDisk:
     """
@@ -600,7 +617,7 @@ class YaDisk:
 
     async def _upload(self,
                       get_upload_link_function: Callable[..., Awaitable[str]],
-                      file_or_path: Union[str, bytes, IO],
+                      file_or_path: FileOrPath,
                       dst_path: str, /, **kwargs) -> None:
         try:
             timeout = kwargs["timeout"]
@@ -621,6 +638,7 @@ class YaDisk:
 
         file = None
         close_file = False
+        generator_factory: Optional[Callable[[], AsyncGenerator]] = None
 
         session = self.get_session()
 
@@ -628,11 +646,17 @@ class YaDisk:
             if isinstance(file_or_path, (str, bytes)):
                 close_file = True
                 file = open(file_or_path, "rb")
+            elif inspect.isasyncgenfunction(file_or_path):
+                generator_factory = file_or_path
             else:
                 close_file = False
                 file = file_or_path
 
-            file_position = file.tell()
+            if generator_factory is None:
+                if is_async_func(file.tell):
+                    file_position = await file.tell()
+                else:
+                    file_position = file.tell()
 
             async def attempt():
                 temp_kwargs = dict(kwargs)
@@ -651,11 +675,24 @@ class YaDisk:
                 except KeyError:
                     temp_kwargs["headers"] = {"Connection": "close"}
 
-                file.seek(file_position)
+                data = None
 
-                # UnclosableFile is used here to prevent aiohttp from closing the file
-                # after uploading it
-                async with session.put(link, data=UnclosableFile(file), **temp_kwargs) as response:
+                if generator_factory is None:
+                    if is_async_func(file.seek):
+                        await file.seek(file_position)
+                    else:
+                        file.seek(file_position)
+
+                    if is_async_func(file.read):
+                        data = read_in_chunks(file)
+                    else:
+                        # UnclosableFile is used here to prevent aiohttp from closing the file
+                        # after uploading it
+                        data = UnclosableFile(file)
+                else:
+                    data = generator_factory()
+
+                async with session.put(link, data=data, **temp_kwargs) as response:
                     if response.status != 201:
                         raise await get_exception(response)
 
@@ -665,12 +702,12 @@ class YaDisk:
                 file.close()
 
     async def upload(self,
-                     path_or_file: Union[str, bytes, IO],
+                     path_or_file: FileOrPath,
                      dst_path: str, /, **kwargs) -> ResourceLinkObject:
         """
             Upload a file to disk.
 
-            :param path_or_file: path or file-like object to be uploaded
+            :param path_or_file: path, file-like object or an async generator function to be uploaded
             :param dst_path: destination path
             :param overwrite: if `True`, the resource will be overwritten if it already exists,
                               an error will be raised otherwise
@@ -695,12 +732,12 @@ class YaDisk:
         return ResourceLinkObject.from_path(dst_path, yadisk=self)
 
     async def upload_by_link(self,
-                             file_or_path: Union[str, bytes, IO],
+                             file_or_path: FileOrPath,
                              link: str, /, **kwargs) -> None:
         """
             Upload a file to disk using an upload link.
 
-            :param file_or_path: path or file-like object to be uploaded
+            :param file_or_path: path, file-like object or an async generator function to be uploaded
             :param link: upload link
             :param overwrite: if `True`, the resource will be overwritten if it already exists,
                               an error will be raised otherwise
@@ -743,7 +780,7 @@ class YaDisk:
     async def _download(self,
                         get_download_link_function: Callable[..., Awaitable[str]],
                         src_path: str,
-                        file_or_path: Union[str, bytes, IO], /, **kwargs) -> None:
+                        file_or_path: FileOrPathDestination, /, **kwargs) -> None:
         n_retries = kwargs.get("n_retries")
 
         if n_retries is None:
@@ -774,9 +811,12 @@ class YaDisk:
                 close_file = False
                 file = file_or_path
 
-            file_position = file.tell()
+            if is_async_func(file.tell):
+                file_position = await file.tell()
+            else:
+                file_position = file.tell()
 
-            async def attempt():
+            async def attempt() -> None:
                 temp_kwargs = dict(kwargs)
                 temp_kwargs["n_retries"] = 0
                 temp_kwargs["retry_interval"] = 0.0
@@ -792,28 +832,29 @@ class YaDisk:
                 except KeyError:
                     temp_kwargs["headers"] = {"Connection": "close"}
 
-                file.seek(file_position)
+                if is_async_func(file.seek):
+                    await file.seek(file_position)
+                else:
+                    file.seek(file_position)
 
                 async with session.get(link, **temp_kwargs) as response:
-                    while True:
-                        chunk = await response.content.read(8192)
-
-                        if not chunk:
-                            break
-
-                        file.write(chunk)
+                    async for chunk in response.content.iter_chunked(8192):
+                        if is_async_func(file.write):
+                            await file.write(chunk)
+                        else:
+                            file.write(chunk)
 
                     if response.status != 200:
                         raise await get_exception(response)
 
-            await auto_retry(attempt, n_retries, retry_interval)
+            return await auto_retry(attempt, n_retries, retry_interval)
         finally:
             if close_file and file is not None:
                 file.close()
 
     async def download(self,
                        src_path: str,
-                       path_or_file: Union[str, bytes, IO], /, **kwargs) -> ResourceLinkObject:
+                       path_or_file: FileOrPathDestination, /, **kwargs) -> ResourceLinkObject:
         """
             Download the file.
 
@@ -837,7 +878,7 @@ class YaDisk:
 
     async def download_by_link(self,
                                link: str,
-                               file_or_path: Union[str, bytes, IO], /, **kwargs) -> None:
+                               file_or_path: FileOrPathDestination, /, **kwargs) -> None:
         """
             Download the file from the link.
 
