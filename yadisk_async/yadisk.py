@@ -18,7 +18,7 @@ from .utils import get_exception, auto_retry
 from .objects import ResourceLinkObject, PublicResourceLinkObject
 
 from typing import Any, Optional, Union, IO, TYPE_CHECKING
-from .compat import Callable, AsyncGenerator, List, Awaitable
+from .compat import Callable, AsyncGenerator, List, Awaitable, Dict
 
 if TYPE_CHECKING:
     from .objects import (
@@ -178,6 +178,12 @@ def is_async_file(file: Any) -> bool:
 
     return is_async_func(read_method)
 
+def _apply_default_args(args: Dict[str, Any], default_args: Dict[str, Any]) -> None:
+    new_args = dict(default_args)
+    new_args.update(args)
+    args.clear()
+    args.update(new_args)
+
 class YaDisk:
     """
         Implements access to Yandex.Disk REST API.
@@ -193,10 +199,14 @@ class YaDisk:
         :param id: application ID
         :param secret: application secret password
         :param token: application token
+        :param default_args: `dict` or `None`, default arguments for methods.
+                             Can be used to set the default timeout, headers, etc.
 
         :ivar id: `str`, application ID
         :ivar secret: `str`, application secret password
         :ivar token: `str`, application token
+        :ivar default_args: `dict`, default arguments for methods. Can be used to
+                            set the default timeout, headers, etc.
 
         The following exceptions may be raised by most API requests:
 
@@ -221,11 +231,17 @@ class YaDisk:
     id: str
     secret: str
     token: str
+    default_args: Dict[str, Any]
 
-    def __init__(self, id: str ="", secret: str = "", token: str = ""):
+    def __init__(self,
+                 id: str ="",
+                 secret: str = "",
+                 token: str = "",
+                 default_args: Optional[Dict[str, Any]] = None):
         self.id = id
         self.secret = secret
         self.token = token
+        self.default_args = {} if default_args is None else default_args
 
         self._sessions = {}
 
@@ -389,6 +405,8 @@ class YaDisk:
             :returns: :any:`TokenObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         async with SessionWithHeaders() as session:
             request = GetTokenRequest(session, code, self.id, self.secret, **kwargs)
             await request.send()
@@ -409,6 +427,8 @@ class YaDisk:
 
             :returns: :any:`TokenObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         async with SessionWithHeaders() as session:
             request = RefreshTokenRequest(
@@ -431,6 +451,8 @@ class YaDisk:
 
             :returns: :any:`TokenRevokeStatusObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         if token is None:
             token = self.token
@@ -456,6 +478,8 @@ class YaDisk:
 
             :returns: :any:`DiskInfoObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = DiskInfoRequest(self.get_session(), **kwargs)
         await request.send()
@@ -484,6 +508,8 @@ class YaDisk:
             :returns: :any:`ResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = GetMetaRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -504,6 +530,8 @@ class YaDisk:
             :returns: `bool`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return await _exists(self.get_meta, path, **kwargs)
 
     async def get_type(self, path: str, /, **kwargs) -> str:
@@ -522,6 +550,8 @@ class YaDisk:
             :returns: "file" or "dir"
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return await _get_type(self.get_meta, path, **kwargs)
 
     async def is_file(self, path: str, /, **kwargs) -> bool:
@@ -538,6 +568,8 @@ class YaDisk:
 
             :returns: `True` if `path` is a file, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_type(path, **kwargs)) == "file"
@@ -558,6 +590,8 @@ class YaDisk:
 
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_type(path, **kwargs)) == "dir"
@@ -586,6 +620,8 @@ class YaDisk:
             :returns: generator of :any:`ResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return _listdir(self.get_meta, path, **kwargs)
 
     async def get_upload_link(self, path: str, /, **kwargs) -> str:
@@ -609,6 +645,8 @@ class YaDisk:
 
             :returns: `str`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = GetUploadLinkRequest(self.get_session(), path, **kwargs)
         await request.send()
@@ -727,8 +765,9 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject`, link to the destination resource
         """
 
-        await self._upload(self.get_upload_link, path_or_file, dst_path, **kwargs)
+        _apply_default_args(kwargs, self.default_args)
 
+        await self._upload(self.get_upload_link, path_or_file, dst_path, **kwargs)
         return ResourceLinkObject.from_path(dst_path, yadisk=self)
 
     async def upload_by_link(self,
@@ -748,6 +787,8 @@ class YaDisk:
 
             :raises InsufficientStorageError: cannot upload file due to lack of storage space
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         async def get_link(*args, **kwargs) -> str:
             return link
@@ -771,6 +812,8 @@ class YaDisk:
 
             :returns: `str`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = GetDownloadLinkRequest(self.get_session(), path, **kwargs)
         await request.send()
@@ -872,8 +915,9 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject`, link to the source resource
         """
 
-        await self._download(self.get_download_link, src_path, path_or_file, **kwargs)
+        _apply_default_args(kwargs, self.default_args)
 
+        await self._download(self.get_download_link, src_path, path_or_file, **kwargs)
         return ResourceLinkObject.from_path(src_path, yadisk=self)
 
     async def download_by_link(self,
@@ -889,6 +933,8 @@ class YaDisk:
             :param n_retries: `int`, maximum number of retries
             :param retry_interval: delay between retries in seconds
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         async def get_link(*args, **kwargs) -> str:
             return link
@@ -918,6 +964,8 @@ class YaDisk:
             :returns: :any:`OperationLinkObject` if the operation is performed asynchronously, `None` otherwise
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = DeleteRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -943,6 +991,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = MkdirRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -960,6 +1010,8 @@ class YaDisk:
 
             :returns: `bool`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         # Any ID will do, doesn't matter whether it exists or not
         fake_operation_id = "0000"
@@ -995,6 +1047,8 @@ class YaDisk:
             :returns: :any:`TrashResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = GetTrashRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -1014,6 +1068,8 @@ class YaDisk:
 
             :returns: `bool`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         return await _exists(self.get_trash_meta, path, **kwargs)
 
@@ -1046,6 +1102,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = CopyRequest(self.get_session(), src_path, dst_path, **kwargs)
         await request.send()
 
@@ -1075,6 +1133,8 @@ class YaDisk:
 
             :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         kwargs["dst_path"] = dst_path
 
@@ -1107,6 +1167,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = MoveRequest(self.get_session(), src_path, dst_path, **kwargs)
         await request.send()
 
@@ -1138,6 +1200,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         new_name = new_name.rstrip("/")
 
         if "/" in new_name or new_name in (".", ".."):
@@ -1166,6 +1230,8 @@ class YaDisk:
             :returns: :any:`OperationLinkObject` if the operation is performed asynchronously, `None` otherwise
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = DeleteTrashRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -1189,6 +1255,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject`, link to the resource
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = PublishRequest(self.get_session(), path, **kwargs)
         await request.send()
 
@@ -1211,6 +1279,8 @@ class YaDisk:
 
             :returns: :any:`ResourceLinkObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = UnpublishRequest(self.get_session(), path, **kwargs)
         await request.send()
@@ -1243,6 +1313,8 @@ class YaDisk:
             :returns: :any:`ResourceLinkObject` or :any:`OperationLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = SaveToDiskRequest(self.get_session(), public_key, **kwargs)
         await request.send()
 
@@ -1273,6 +1345,8 @@ class YaDisk:
             :returns: :any:`PublicResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = GetPublicMetaRequest(self.get_session(), public_key, **kwargs)
         await request.send()
 
@@ -1293,6 +1367,8 @@ class YaDisk:
 
             :returns: `bool`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         return await _exists(self.get_public_meta, public_key, **kwargs)
 
@@ -1321,6 +1397,8 @@ class YaDisk:
             :returns: generator of :any:`PublicResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return _listdir(self.get_public_meta, public_key, **kwargs)
 
     async def get_public_type(self, public_key: str, /, **kwargs) -> str:
@@ -1340,6 +1418,8 @@ class YaDisk:
             :returns: "file" or "dir"
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return await _get_type(self.get_public_meta, public_key, **kwargs)
 
     async def is_public_dir(self, public_key: str, /, **kwargs) -> bool:
@@ -1357,6 +1437,8 @@ class YaDisk:
 
             :returns: `True` if `public_key` is a directory, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_public_type(public_key, **kwargs)) == "dir"
@@ -1378,6 +1460,8 @@ class YaDisk:
 
             :returns: `True` if `public_key` is a file, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_public_type(public_key, **kwargs)) == "file"
@@ -1406,6 +1490,8 @@ class YaDisk:
             :returns: generator of :any:`TrashResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return _listdir(self.get_trash_meta, path, **kwargs)
 
     async def get_trash_type(self, path: str, /, **kwargs) -> str:
@@ -1424,6 +1510,8 @@ class YaDisk:
             :returns: "file" or "dir"
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         return await _get_type(self.get_trash_meta, path, **kwargs)
 
     async def is_trash_dir(self, path: str, /, **kwargs) -> bool:
@@ -1440,6 +1528,8 @@ class YaDisk:
 
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_trash_type(path, **kwargs)) == "dir"
@@ -1460,6 +1550,8 @@ class YaDisk:
 
             :returns: `True` if `path` is a directory, `False` otherwise (even if it doesn't exist)
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         try:
             return (await self.get_trash_type(path, **kwargs)) == "file"
@@ -1486,6 +1578,8 @@ class YaDisk:
             :returns: :any:`PublicResourcesListObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = GetPublicResourcesRequest(self.get_session(), **kwargs)
         await request.send()
 
@@ -1509,6 +1603,8 @@ class YaDisk:
 
             :returns: :any:`ResourceObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = PatchRequest(self.get_session(), path, properties, **kwargs)
         await request.send()
@@ -1535,6 +1631,8 @@ class YaDisk:
 
             :returns: generator of :any:`ResourceObject`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         if kwargs.get("limit") is not None:
             request = FilesRequest(self.get_session(), **kwargs)
@@ -1578,6 +1676,8 @@ class YaDisk:
             :returns: generator of :any:`ResourceObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = LastUploadedRequest(self.get_session(), **kwargs)
         await request.send()
 
@@ -1607,6 +1707,8 @@ class YaDisk:
             :returns: :any:`OperationLinkObject`, link to the asynchronous operation
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         request = UploadURLRequest(self.get_session(), url, path, **kwargs)
         await request.send()
 
@@ -1630,6 +1732,8 @@ class YaDisk:
 
             :returns: `str`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         request = GetPublicDownloadLinkRequest(self.get_session(), public_key, **kwargs)
         await request.send()
@@ -1657,6 +1761,8 @@ class YaDisk:
             :returns: :any:`PublicResourceLinkObject`
         """
 
+        _apply_default_args(kwargs, self.default_args)
+
         await self._download(
             lambda *args, **kwargs: self.get_public_download_link(public_key),
             "", file_or_path, **kwargs)
@@ -1677,6 +1783,8 @@ class YaDisk:
 
             :returns: `str`
         """
+
+        _apply_default_args(kwargs, self.default_args)
 
         return await self._get_operation_status(self.get_session(), operation_id, **kwargs)
 
