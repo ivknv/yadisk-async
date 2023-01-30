@@ -11,6 +11,21 @@ Changelog
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
 .. _issue #26: https://github.com/ivknv/yadisk/issues/26
 
+* **Release 1.4.0 (2023-01-30)**
+
+  * Added convenience methods to `...Object` objects (e.g. see `ResourceObject`)
+  * Added type hints
+  * Improved error checking and response validation
+  * Added `InvalidResponseError`, `PayloadTooLargeError`, `UploadTrafficLimitExceededError`
+  * Added a few missing fields to `DiskInfoObject` and `SystemFoldersObject`
+  * Added `rename()`, `upload_by_link()` and `download_by_link()` methods
+  * Added `default_args` field for `YaDisk` object
+  * `download()` and `upload()` now return `ResourceLinkObject`
+  * Returned `LinkObject` instances have been replaced by more specific subclasses
+  * :any:`TimeoutError` now also triggers a retry
+  * Added support for async files for `download()` and `upload()`
+  * Use `aiofiles` to open files by default
+
 * **Release 1.3.6 (2023-01-20)**
 
   * Fixed `issue #26`_: ':' character in filenames causes `BadRequestError`.

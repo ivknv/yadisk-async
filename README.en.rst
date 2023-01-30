@@ -9,10 +9,6 @@ YaDisk-async
    :alt: PyPI
    :target: https://pypi.org/project/yadisk-async
 
-.. image:: https://img.shields.io/aur/version/python-yadisk-async.svg
-   :alt: AUR
-   :target: https://aur.archlinux.org/packages/python-yadisk-async
-
 YaDisk-async is a Yandex.Disk REST API client library with async/await support.
 
 .. _Read the Docs (EN): http://yadisk-async.readthedocs.io
@@ -57,17 +53,17 @@ Examples
     await y.upload("file_to_upload.txt", "/destination.txt")
 
     # Same thing
-    with open("file_to_upload.txt", "rb") as f:
+    async with aiofiles.open("file_to_upload.txt", "rb") as f:
         await y.upload(f, "/destination.txt")
 
-    # Same but with aiofiles
-    async with aiofiles.open("file_to_upload.txt", "rb") as f:
+    # Same thing but with regular files
+    with open("file_to_upload.txt", "rb") as f:
         await y.upload(f, "/destination.txt")
 
     # Download "/some-file-to-download.txt" to "downloaded.txt"
     await y.download("/some-file-to-download.txt", "downloaded.txt")
 
-    # Same but with aiofiles
+    # Same thing
     async with aiofiles.open("downloaded.txt", "wb") as f:
         await y.download("/some-file-to-download.txt", f)
 
@@ -92,6 +88,21 @@ Changelog
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
 .. _issue #26: https://github.com/ivknv/yadisk/issues/26
+
+* **Release 1.4.0 (2023-01-30)**
+
+  * Added convenience methods to :code:`...Object` objects (e.g. see :code:`ResourceObject` in docs)
+  * Added type hints
+  * Improved error checking and response validation
+  * Added :code:`InvalidResponseError`, :code:`PayloadTooLargeError`, :code:`UploadTrafficLimitExceededError`
+  * Added a few missing fields to :code:`DiskInfoObject` and :code:`SystemFoldersObject`
+  * Added :code:`rename()`, :code:`upload_by_link()` and :code:`download_by_link()` methods
+  * Added :code:`default_args` field for :code:`YaDisk` object
+  * :code:`download()` and :code:`upload()` now return :code:`ResourceLinkObject`
+  * Returned :code:`LinkObject` instances have been replaced by more specific subclasses
+  * :code:`TimeoutError` now also triggers a retry
+  * Added support for async files for :code:`download()` and :code:`upload()`
+  * Use :code:`aiofiles` to open files by default
 
 * **Release 1.3.6 (2023-01-20)**
 

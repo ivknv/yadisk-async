@@ -9,10 +9,6 @@ YaDisk-async
    :alt: PyPI
    :target: https://pypi.org/project/yadisk-async
 
-.. image:: https://img.shields.io/aur/version/python-yadisk-async.svg
-   :alt: AUR
-   :target: https://aur.archlinux.org/packages/python-yadisk-async
-
 YaDisk-async - это библиотека-клиент REST API Яндекс.Диска с поддержкой async/await.
 
 .. _Read the Docs (EN): http://yadisk-async.readthedocs.io
@@ -92,6 +88,21 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
 .. _issue #26: https://github.com/ivknv/yadisk/issues/26
+
+* **Release 1.4.0 (2023-01-30)**
+
+  * Добавлены convenience-методы для объектов :code:`...Object` (например, см. :code:`ResourceObject`)
+  * Добавлены подсказки типов (type hints)
+  * Улучшены проверки ошибок и проверка ответа
+  * Добавлены :code:`InvalidResponseError`, :code:`PayloadTooLargeError`, :code:`UploadTrafficLimitExceededError`
+  * Добавлено несколько недостающих полей объектов :code:`DiskInfoObject` и :code:`SystemFoldersObject`
+  * Добавлены методы :code:`rename()`, :code:`upload_by_link()` и :code:`download_by_link()`
+  * Добавлен аттрибут :code:`default_args` объекта :code:`YaDisk`
+  * :code:`download()` и :code:`upload()` теперь возвращают :code:`ResourceLinkObject`
+  * До этого возвращаемые объекты :code:`LinkObject` были заменены более конкретными подклассами
+  * :code:`TimeoutError` теперь тоже вызывает повторную попытку
+  * Добавлена поддержка асинхронных файлов для :code:`download()` и :code:`upload()`
+  * По умолчанию используется библиотека :code:`aiofiles` для открытия файлов
 
 * **Release 1.3.6 (2023-01-20)**
 
