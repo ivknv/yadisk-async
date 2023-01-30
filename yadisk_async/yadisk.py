@@ -12,13 +12,16 @@ from .common import FileOrPath, FileOrPathDestination
 from . import settings
 from .session import SessionWithHeaders
 from .api import *
-from .exceptions import InvalidResponseError, UnauthorizedError, OperationNotFoundError
-from .exceptions import PathNotFoundError, WrongResourceTypeError
+from .exceptions import (
+    InvalidResponseError, UnauthorizedError, OperationNotFoundError,
+    PathNotFoundError, WrongResourceTypeError)
 from .utils import get_exception, auto_retry
 from .objects import ResourceLinkObject, PublicResourceLinkObject
 
 from typing import Any, Optional, Union, IO, TYPE_CHECKING
 from .compat import Callable, AsyncGenerator, List, Awaitable, Dict
+
+import aiofiles
 
 if TYPE_CHECKING:
     from .objects import (
@@ -683,7 +686,7 @@ class YaDisk:
         try:
             if isinstance(file_or_path, (str, bytes)):
                 close_file = True
-                file = open(file_or_path, "rb")
+                file = await aiofiles.open(file_or_path, "rb")
             elif inspect.isasyncgenfunction(file_or_path):
                 generator_factory = file_or_path
             else:
@@ -737,7 +740,7 @@ class YaDisk:
             await auto_retry(attempt, n_retries, retry_interval)
         finally:
             if close_file and file is not None:
-                file.close()
+                await file.close()
 
     async def upload(self,
                      path_or_file: FileOrPath,
@@ -849,7 +852,7 @@ class YaDisk:
         try:
             if isinstance(file_or_path, (str, bytes)):
                 close_file = True
-                file = open(file_or_path, "wb")
+                file = await aiofiles.open(file_or_path, "wb")
             else:
                 close_file = False
                 file = file_or_path
@@ -893,7 +896,7 @@ class YaDisk:
             return await auto_retry(attempt, n_retries, retry_interval)
         finally:
             if close_file and file is not None:
-                file.close()
+                await file.close()
 
     async def download(self,
                        src_path: str,
