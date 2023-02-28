@@ -114,6 +114,13 @@ async def _listdir(get_meta_function: Callable[..., Awaitable[ResourceType]],
         limit: int = result.embedded.limit
         total: int = result.embedded.total
 
+def _filter_kwargs_for_requests(kwargs: dict[str, Any]) -> None:
+    # Remove some of the yadisk-specific arguments from kwargs
+    keys_to_remove = ("n_retries", "retry_interval", "fields", "overwrite", "path")
+
+    for key in keys_to_remove:
+        kwargs.pop(key, None)
+
 class UnclosableFile(io.IOBase):
     """
         File-like object that cannot be closed.
@@ -706,9 +713,8 @@ class YaDisk:
 
                 link = await get_upload_link_function(dst_path, **temp_kwargs)
 
-                # session.put() doesn't accept these parameters
-                for k in ("n_retries", "retry_interval", "overwrite", "fields"):
-                    temp_kwargs.pop(k, None)
+                # session.get() doesn't accept some of the passed parameters
+                _filter_kwargs_for_requests(temp_kwargs)
 
                 # Disable keep-alive by default, since the upload server is random
                 try:
@@ -868,9 +874,8 @@ class YaDisk:
                 temp_kwargs["retry_interval"] = 0.0
                 link = await get_download_link_function(src_path, **temp_kwargs)
 
-                # session.get() doesn't accept these parameters
-                for k in ("n_retries", "retry_interval", "fields"):
-                    temp_kwargs.pop(k, None)
+                # session.get() doesn't accept some of the passed parameters
+                _filter_kwargs_for_requests(temp_kwargs)
 
                 # Disable keep-alive by default, since the download server is random
                 try:
@@ -1767,7 +1772,7 @@ class YaDisk:
         _apply_default_args(kwargs, self.default_args)
 
         await self._download(
-            lambda *args, **kwargs: self.get_public_download_link(public_key),
+            lambda *args, **kwargs: self.get_public_download_link(public_key, **kwargs),
             "", file_or_path, **kwargs)
         return PublicResourceLinkObject.from_public_key(public_key, yadisk=self)
 
