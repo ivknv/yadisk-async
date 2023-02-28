@@ -114,7 +114,7 @@ async def _listdir(get_meta_function: Callable[..., Awaitable[ResourceType]],
         limit: int = result.embedded.limit
         total: int = result.embedded.total
 
-def _filter_kwargs_for_requests(kwargs: dict[str, Any]) -> None:
+def _filter_kwargs_for_aiohttp(kwargs: dict[str, Any]) -> None:
     # Remove some of the yadisk-specific arguments from kwargs
     keys_to_remove = ("n_retries", "retry_interval", "fields", "overwrite", "path")
 
@@ -714,7 +714,7 @@ class YaDisk:
                 link = await get_upload_link_function(dst_path, **temp_kwargs)
 
                 # session.get() doesn't accept some of the passed parameters
-                _filter_kwargs_for_requests(temp_kwargs)
+                _filter_kwargs_for_aiohttp(temp_kwargs)
 
                 # Disable keep-alive by default, since the upload server is random
                 try:
@@ -875,7 +875,7 @@ class YaDisk:
                 link = await get_download_link_function(src_path, **temp_kwargs)
 
                 # session.get() doesn't accept some of the passed parameters
-                _filter_kwargs_for_requests(temp_kwargs)
+                _filter_kwargs_for_aiohttp(temp_kwargs)
 
                 # Disable keep-alive by default, since the download server is random
                 try:
