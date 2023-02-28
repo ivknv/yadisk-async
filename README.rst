@@ -51,19 +51,19 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 
     # Загружает "file_to_upload.txt" в "/destination.txt"
     await y.upload("file_to_upload.txt", "/destination.txt")
-    
+
     # То же самое
-    async with aiofiles.open("file_to_upload.txt", "rb") as f:
+    with open("file_to_upload.txt", "rb") as f:
         await y.upload(f, "/destination.txt")
 
-    # То же самое, но с обычными файлами
-    with open("file_to_upload.txt", "rb") as f:
+    # То же самое, но с aiofiles
+    async with aiofiles.open("file_to_upload.txt", "rb") as f:
         await y.upload(f, "/destination.txt")
 
     # Скачивает "/some-file-to-download.txt" в "downloaded.txt"
     await y.download("/some-file-to-download.txt", "downloaded.txt")
 
-    # То же самое
+    # То же самое, но с aiofiles
     async with aiofiles.open("downloaded.txt", "wb") as f:
         await y.download("/some-file-to-download.txt", f)
 
@@ -88,6 +88,12 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #23: https://github.com/ivknv/yadisk/issues/23
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
 .. _issue #26: https://github.com/ivknv/yadisk/issues/26
+.. _issue #28: https://github.com/ivknv/yadisk/issues/28
+
+* **Release 1.4.1 (2023-02-28)**
+
+  * Исправлено `issue #28`_: :code:`TypeError` при вызове :code:`download_public()` с параметром :code:`path`
+  * Исправлено :code:`AttributeError` при вызове :code:`ResourceLinkObject.public_listdir()`
 
 * **Release 1.4.0 (2023-01-30)**
 
