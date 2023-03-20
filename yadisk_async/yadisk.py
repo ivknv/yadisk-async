@@ -114,7 +114,7 @@ async def _listdir(get_meta_function: Callable[..., Awaitable[ResourceType]],
         limit: int = result.embedded.limit
         total: int = result.embedded.total
 
-def _filter_kwargs_for_aiohttp(kwargs: dict[str, Any]) -> None:
+def _filter_kwargs_for_aiohttp(kwargs: Dict[str, Any]) -> None:
     # Remove some of the yadisk-specific arguments from kwargs
     keys_to_remove = ("n_retries", "retry_interval", "fields", "overwrite", "path")
 
