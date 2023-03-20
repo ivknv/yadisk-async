@@ -89,6 +89,11 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _PR #6: https://github.com/ivknv/yadisk-async/pull/6
 .. _issue #26: https://github.com/ivknv/yadisk/issues/26
 .. _issue #28: https://github.com/ivknv/yadisk/issues/28
+.. _issue #29: https://github.com/ivknv/yadisk/issues/29
+
+* **Release 1.4.2 (2023-03-20)**
+
+  * Исправлено `issue #29`_: TypeError: 'type' object is not subscriptable
 
 * **Release 1.4.1 (2023-02-28)**
 

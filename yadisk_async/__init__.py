@@ -3,4 +3,4 @@
 from . import api, objects, exceptions, utils
 from .yadisk import YaDisk
 
-__version__ = "1.4.1"
+__version__ = "1.4.2"
