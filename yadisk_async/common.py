@@ -112,7 +112,7 @@ FileOrPath = Union[
     bytes,
     IO,
     AsyncFileLike,
-    Callable[[], AsyncIterable[bytes, None]]]
+    Callable[[], AsyncIterable[bytes]]]
 
 FileOrPathDestination = Union[
     str,
