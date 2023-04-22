@@ -91,10 +91,14 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #28: https://github.com/ivknv/yadisk/issues/28
 .. _issue #29: https://github.com/ivknv/yadisk/issues/29
 
+* **Release 1.4.3 (2023-04-22)**
+
+  * Пути вида :code:`app:/` теперь работают правильно (см. `issue #26`_)
+
 * **Release 1.4.2 (2023-03-20)**
 
   * Исправлено `issue #29`_: TypeError: 'type' object is not subscriptable
-  * Исправлена ошибка (Python <3.9): `TypeError: Too many parameters for typing.AsyncIterable; actual 2, expected 1`
+  * Исправлена ошибка (Python <3.9): TypeError: Too many parameters for typing.AsyncIterable; actual 2, expected 1
 
 * **Release 1.4.1 (2023-02-28)**
 
