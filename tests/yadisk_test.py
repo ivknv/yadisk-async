@@ -363,3 +363,31 @@ class YaDiskTestCase(TestCase):
         self.assertEqual(ensure_path_has_schema("/asd:123", "trash"), "trash:/asd:123")
         self.assertEqual(ensure_path_has_schema("example/path"), "disk:/example/path")
         self.assertEqual(ensure_path_has_schema("app:/test"), "app:/test")
+
+    @async_test
+    async def test_upload_download_non_seekable(self):
+        # It should be possible to upload/download non-seekable file objects (such as stdin/stdout)
+        # See https://github.com/ivknv/yadisk/pull/31 for more details
+
+        test_input_file = BytesIO(b"0" * 1000)
+        test_input_file.seekable = lambda: False
+
+        def seek(*args, **kwargs):
+            raise NotImplementedError
+
+        test_input_file.seek = seek
+
+        dst_path = posixpath.join(self.path, "zeroes.txt")
+
+        await self.yadisk.upload(test_input_file, dst_path, n_retries=50)
+
+        test_output_file = BytesIO()
+        test_output_file.seekable = lambda: False
+        test_output_file.seek = seek
+
+        await self.yadisk.download(dst_path, test_output_file, n_retries=50)
+
+        await self.yadisk.remove(dst_path, permanently=True)
+
+        self.assertEqual(test_input_file.tell(), 1000)
+        self.assertEqual(test_output_file.tell(), 1000)

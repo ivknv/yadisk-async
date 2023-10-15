@@ -188,6 +188,28 @@ def is_async_file(file: Any) -> bool:
 
     return is_async_func(read_method)
 
+async def _file_tell(file: Any) -> int:
+    if is_async_func(file.tell):
+        return await file.tell()
+    else:
+        return file.tell()
+
+async def _file_seek(file: Any, offset: int, whence: int = 0) -> int:
+    if is_async_func(file.seek):
+        return await file.seek(offset, whence)
+    else:
+        return file.seek(offset, whence)
+
+async def _is_file_seekable(file: Any) -> bool:
+    if not hasattr(file, "seekable"):
+        # Assume the file is seekable if there's no way to check
+        return True
+
+    if is_async_func(file.seekable):
+        return await file.seekable()
+
+    return file.seekable();
+
 def _apply_default_args(args: Dict[str, Any], default_args: Dict[str, Any]) -> None:
     new_args = dict(default_args)
     new_args.update(args)
@@ -682,11 +704,17 @@ class YaDisk:
         if n_retries is None:
             n_retries = settings.DEFAULT_N_RETRIES
 
+        # Number of retries for getting the upload link.
+        # It is set to 0, unless the file is not seekable, in which case
+        # we have to use a different retry scheme
+        n_retries_for_upload_link = 0
+
         kwargs["timeout"] = timeout
 
         file = None
         close_file = False
         generator_factory: Optional[Callable[[], AsyncGenerator]] = None
+        file_position = 0
 
         session = self.get_session()
 
@@ -701,14 +729,14 @@ class YaDisk:
                 file = file_or_path
 
             if generator_factory is None:
-                if is_async_func(file.tell):
-                    file_position = await file.tell()
+                if await _is_file_seekable(file):
+                    file_position = await _file_tell(file)
                 else:
-                    file_position = file.tell()
+                    n_retries, n_retries_for_upload_link = 0, n_retries
 
             async def attempt():
                 temp_kwargs = dict(kwargs)
-                temp_kwargs["n_retries"] = 0
+                temp_kwargs["n_retries"] = n_retries_for_upload_link
                 temp_kwargs["retry_interval"] = 0.0
 
                 link = await get_upload_link_function(dst_path, **temp_kwargs)
@@ -725,10 +753,8 @@ class YaDisk:
                 data = None
 
                 if generator_factory is None:
-                    if is_async_func(file.seek):
-                        await file.seek(file_position)
-                    else:
-                        file.seek(file_position)
+                    if await _is_file_seekable(file):
+                        await _file_seek(file, file_position)
 
                     if is_async_func(file.read):
                         data = read_in_chunks(file)
@@ -838,6 +864,11 @@ class YaDisk:
         if n_retries is None:
             n_retries = settings.DEFAULT_N_RETRIES
 
+        # Number of retries for getting the download link.
+        # It is set to 0, unless the file is not seekable, in which case
+        # we have to use a different retry scheme
+        n_retries_for_download_link = 0
+
         retry_interval = kwargs.get("retry_interval")
 
         if retry_interval is None:
@@ -852,6 +883,7 @@ class YaDisk:
 
         file = None
         close_file = False
+        file_position = 0
 
         session = self.get_session()
 
@@ -863,14 +895,14 @@ class YaDisk:
                 close_file = False
                 file = file_or_path
 
-            if is_async_func(file.tell):
-                file_position = await file.tell()
+            if await _is_file_seekable(file):
+                file_position = await _file_tell(file)
             else:
-                file_position = file.tell()
+                n_retries, n_retries_for_download_link = 0, n_retries
 
             async def attempt() -> None:
                 temp_kwargs = dict(kwargs)
-                temp_kwargs["n_retries"] = 0
+                temp_kwargs["n_retries"] = n_retries_for_download_link
                 temp_kwargs["retry_interval"] = 0.0
                 link = await get_download_link_function(src_path, **temp_kwargs)
 
@@ -883,10 +915,8 @@ class YaDisk:
                 except KeyError:
                     temp_kwargs["headers"] = {"Connection": "close"}
 
-                if is_async_func(file.seek):
-                    await file.seek(file_position)
-                else:
-                    file.seek(file_position)
+                if await _is_file_seekable(file):
+                    await _file_seek(file, file_position)
 
                 async with session.get(link, **temp_kwargs) as response:
                     async for chunk in response.content.iter_chunked(8192):
