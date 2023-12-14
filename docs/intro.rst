@@ -6,6 +6,10 @@ Introduction
 YaDisk-async is a modified version of `YaDisk`_ with :code:`async/await` support.
 It uses `aiohttp` instead of `requests`.
 
+.. warning::
+   This library is no longer maintained, use `yadisk <https://pypi.org/project/yadisk>`__>=2.0.0 instead, it also
+   supports async API.
+
 The usage is more or less the same, except that you have to manually close
 all the sessions (can be done with :any:`YaDisk.close` or through :code:`async with` statement).
 

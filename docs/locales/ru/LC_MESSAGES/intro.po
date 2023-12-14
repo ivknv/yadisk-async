@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: YaDisk 1.3.5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2019-07-06 19:19+0500\n"
+"POT-Creation-Date: 2023-12-14 23:07+0500\n"
 "PO-Revision-Date: 2018-01-05 22:45+0500\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.6.0\n"
+"Generated-By: Babel 2.14.0\n"
 
 #: ../../intro.rst:2
 msgid "Introduction"
@@ -25,43 +25,54 @@ msgstr "Введение"
 msgid ""
 "YaDisk-async is a modified version of `YaDisk`_ with :code:`async/await` "
 "support. It uses `aiohttp` instead of `requests`."
-msgstr "YaDisk-async - это модифицированная версия `YaDisk`_ с поддержкой "
+msgstr ""
+"YaDisk-async - это модифицированная версия `YaDisk`_ с поддержкой "
 ":code:`async/await`, использует `aiohttp` вместо `requests`."
 
-#: ../../intro.rst:9
+#: ../../intro.rst:10
+msgid ""
+"This library is no longer maintained, use `yadisk "
+"<https://pypi.org/project/yadisk>`__>=2.0.0 instead, it also supports "
+"async API."
+msgstr "Данная библиотека больше не поддерживается, используйте `yadisk "
+"<https://pypi.org/project/yadisk>`__>=2.0.0 вместо неё, она также поддерживает "
+"асинхронный API."
+
+#: ../../intro.rst:13
 msgid ""
 "The usage is more or less the same, except that you have to manually "
 "close all the sessions (can be done with :any:`YaDisk.close` or through "
 ":code:`async with` statement)."
-msgstr "Использование библиотеки почти не отличается, не считая того, что "
-"закрывать все сессии нужно вручную (может быть сделано с помощью :any:`YaDisk.close` или "
-"через конструкцию :code:`async with`)."
+msgstr ""
+"Использование библиотеки почти не отличается, не считая того, что "
+"закрывать все сессии нужно вручную (может быть сделано с помощью "
+":any:`YaDisk.close` или через конструкцию :code:`async with`)."
 
-#: ../../intro.rst:13
+#: ../../intro.rst:17
 msgid "Installation"
 msgstr "Установка"
 
-#: ../../intro.rst:19
+#: ../../intro.rst:23
 msgid "or"
 msgstr "или"
 
-#: ../../intro.rst:26
+#: ../../intro.rst:30
 msgid "Examples"
 msgstr "Примеры"
 
-#: ../../intro.rst:65
+#: ../../intro.rst:77
 msgid "Receiving token with confirmation code"
 msgstr "Получение токена через код подтверждения"
 
-#: ../../intro.rst:97
+#: ../../intro.rst:109
 msgid "Recursive upload"
 msgstr "Рекурсивная загрузка файлов"
 
-#: ../../intro.rst:172
+#: ../../intro.rst:184
 msgid "Setting custom properties of files"
 msgstr "Задание пользовательских свойств файлов"
 
-#: ../../intro.rst:202
+#: ../../intro.rst:215
 msgid "Emptying the trash bin"
 msgstr "Очищение корзины"
 

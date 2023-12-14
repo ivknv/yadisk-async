@@ -6,6 +6,12 @@
 Welcome to YaDisk's documentation!
 ==================================
 
+.. _yadisk: https://pypi.org/project/yadisk
+
+.. warning::
+   This library is no longer maintained, use `yadisk`_>=2.0.0 instead, it also
+   supports async API.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

@@ -11,6 +11,10 @@ YaDisk-async
 
 YaDisk-async - это библиотека-клиент REST API Яндекс.Диска с поддержкой async/await.
 
+.. warning::
+   Данная библиотека больше не поддерживается, используйте `yadisk <https://pypi.org/project/yadisk>`__>=2.0.0
+   вместо неё, она также поддерживает асинхронный API.
+
 .. _Read the Docs (EN): http://yadisk-async.readthedocs.io
 .. _Read the Docs (RU): http://yadisk-async.readthedocs.io/ru/latest
 
@@ -91,6 +95,13 @@ YaDisk-async - это библиотека-клиент REST API Яндекс.Д
 .. _issue #28: https://github.com/ivknv/yadisk/issues/28
 .. _issue #29: https://github.com/ivknv/yadisk/issues/29
 .. _PR #31: https://github.com/ivknv/yadisk/pull/31
+
+* **Release 1.4.5 (2023-12-14)**
+
+  * Добавлено предупреждение об устаревании при импорте
+  * Данная библиотека больше не поддерживается, используйте `yadisk
+    <https://pypi.org/project/yadisk>`__>=2.0.0 вместо неё, она также поддерживает
+    асинхронный API
 
 * **Release 1.4.4 (2023-10-15)**
 
